@@ -1,0 +1,327 @@
+/**
+ * Adaptive performance — apply via PerformanceManager + this stylesheet.
+ * Root gets .perf-tier-lite | .perf-tier-full and CSS variables.
+ */
+
+/* --- Lite: lightweight mode --- */
+.perf-tier-lite *,
+.perf-tier-lite *::before,
+.perf-tier-lite *::after {
+  animation-duration: calc(var(--perf-transition-duration, 0.12s) * var(--perf-animation-speed, 0.5)) !important;
+  transition-duration: calc(var(--perf-transition-duration, 0.12s) * var(--perf-animation-speed, 0.5)) !important;
+}
+
+.perf-tier-lite [data-effect="particles"],
+.perf-tier-lite [data-effect="background"],
+.perf-tier-lite .fx-particles,
+.perf-tier-lite .fx-background {
+  display: none !important;
+}
+
+.perf-tier-lite [data-effect="blur"],
+.perf-tier-lite .fx-blur {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+
+.perf-tier-lite [data-effect="glow"],
+.perf-tier-lite .fx-glow {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.perf-tier-lite [data-effect="animated-gradient"],
+.perf-tier-lite .fx-gradient-animated {
+  animation: none !important;
+  background-size: 100% 100% !important;
+}
+
+.perf-tier-lite [data-chart="advanced"],
+.perf-tier-lite .chart-advanced {
+  display: none !important;
+}
+
+.perf-tier-lite [data-chart="simple"],
+.perf-tier-lite .chart-simple {
+  display: block !important;
+}
+
+/* --- Full: rich graphics --- */
+.perf-tier-full [data-chart="simple"] {
+  display: none;
+}
+
+.perf-tier-full [data-chart="advanced"],
+.perf-tier-full .chart-advanced {
+  display: block;
+}
+
+.perf-tier-full .fx-glow {
+  box-shadow: 0 0 24px rgba(0, 229, 255, calc(0.35 * var(--perf-enable-glow, 1)));
+}
+
+.perf-tier-full .fx-blur {
+  backdrop-filter: blur(var(--perf-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--perf-blur, 12px));
+}
+
+.perf-tier-full .fx-gradient-animated {
+  background-size: 200% 200%;
+  animation: perf-gradient-shift 8s ease infinite;
+}
+
+@keyframes perf-gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* --- Reduced motion (accessibility) --- */
+.perf-reduced-motion *,
+.perf-reduced-motion *::before,
+.perf-reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.perf-reduced-motion [data-effect="particles"],
+.perf-reduced-motion .fx-particles {
+  display: none !important;
+}
+
+/* --- Realtime dashboard: tab hidden / charts paused --- */
+.perf-tab-hidden [data-effect="particles"],
+.perf-tab-hidden .fx-particles,
+.perf-tab-hidden .fx-gradient-animated {
+  animation: none !important;
+}
+
+html[data-perf-charts-paused="true"] .chart-advanced,
+html[data-perf-charts-paused="true"] .recharts-wrapper {
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+/* Safari: compositor-only motion */
+.perf-safari-legacy .fx-glow,
+.perf-safari-legacy [data-effect="glow"] {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.perf-safari-legacy .recharts-surface {
+  will-change: auto;
+}
+
+/* --- Safari / iPad legacy compositing --- */
+.perf-tier-lite.perf-safari-legacy .fx-blur,
+.perf-tier-lite [data-perf-blur="false"] .fx-blur {
+  transform: translateZ(0);
+  will-change: auto;
+}
+
+/* --- Settings panel --- */
+.perf-settings-panel {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #e8eaed;
+  background: rgba(18, 20, 28, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 240px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.perf-settings-panel--floating {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+}
+
+.perf-settings-panel__header {
+  margin-bottom: 12px;
+}
+
+.perf-settings-panel__title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.perf-settings-panel__tier {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.perf-settings-panel__modes {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.perf-settings-panel__mode {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.perf-settings-panel__mode:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.perf-settings-panel__mode.is-active {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.12);
+}
+
+.perf-settings-panel__details {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.perf-settings-panel__details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.perf-settings-panel__reasons {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+
+.perf-settings-panel__meta {
+  margin: 0;
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+/* --- GPU-safe (no blur stack / animated shadow) --- */
+.gpu-safe-lite .fx-blur,
+[data-gpu-safe="true"] .fx-blur {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+
+.gpu-safe-lite .fx-glow {
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+/* --- Theme: lite vs cyberpunk full --- */
+.theme-lite {
+  --theme-glow: 0.15;
+  background-color: #0d1117;
+}
+
+.theme-cyberpunk .fx-accent {
+  position: relative;
+  transform: translateZ(0);
+  opacity: 1;
+}
+
+.theme-cyberpunk .fx-accent::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--theme-glow, 0.5);
+  background: var(--gpu-accent-gradient, linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(122, 92, 255, 0.1)));
+  transform: translateZ(0);
+}
+
+.theme-cyberpunk.theme-cyberpunk .fx-accent--animated::after {
+  animation: perf-accent-pulse 4s ease-in-out infinite;
+}
+
+@keyframes perf-accent-pulse {
+  0%, 100% { opacity: calc(var(--theme-glow, 0.5) * 0.7); }
+  50% { opacity: var(--theme-glow, 0.5); }
+}
+
+/* --- Offline / reconnect --- */
+.platform-offline [data-live="true"] {
+  opacity: 0.55;
+}
+
+.platform-offline [data-stale="true"]::after,
+[data-stale="true"]::after {
+  content: 'Stale';
+  font-size: 10px;
+  margin-left: 6px;
+  color: #f0ad4e;
+}
+
+.platform-reconnecting .dashboard-shell {
+  animation: platform-reconnect 0.6s ease;
+}
+
+@keyframes platform-reconnect {
+  from { opacity: 0.6; transform: translateZ(0) scale(0.99); }
+  to { opacity: 1; transform: translateZ(0) scale(1); }
+}
+
+/* --- Debug overlay (dev) --- */
+.perf-debug-overlay {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100001;
+  font: 11px/1.45 ui-monospace, monospace;
+  color: #0ff;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 8px;
+  padding: 10px 12px;
+  pointer-events: none;
+  min-width: 200px;
+}
+
+.perf-debug-overlay__title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #fff;
+}
+
+.perf-error-boundary {
+  padding: 1rem;
+  border: 1px solid #f85149;
+  border-radius: 8px;
+  background: rgba(248, 81, 73, 0.08);
+}
+
+/* --- Virtualized dashboard cards --- */
+.dashboard-virtual-viewport {
+  position: relative;
+  overflow: auto;
+  contain: strict;
+}
+
+.dashboard-virtual-spacer {
+  pointer-events: none;
+}
+
+.dashboard-card[data-lazy="pending"] {
+  min-height: 120px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.safari-guard-active .recharts-surface {
+  shape-rendering: optimizeSpeed;
+}

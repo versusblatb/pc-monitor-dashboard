@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Realtime Dashboard Platform</title>
+    <link rel="stylesheet" href="../src/styles/adaptive.css" />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, sans-serif;
+        background: #0d1117;
+        color: #e6edf3;
+      }
+      main { padding: 2rem; max-width: 800px; }
+      .dashboard-shell { padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+      .fx-accent { padding: 1rem; margin: 1rem 0; border-radius: 8px; }
+      .metric { font-family: ui-monospace, monospace; font-size: 13px; }
+      pre { font-size: 11px; overflow: auto; }
+    </style>
+  </head>
+  <body class="dashboard-shell">
+    <main>
+      <h1>Realtime Dashboard Platform</h1>
+      <p>Transport: WS → SSE → polling · Battery · Thermal · Cache · Offline</p>
+      <div class="fx-accent fx-glow" data-live="true" data-stale="false">
+        <div class="metric" id="metrics">Waiting for metrics…</div>
+      </div>
+      <pre id="status">Initializing…</pre>
+    </main>
+
+    <script type="module">
+      import {
+        RealtimeDashboardPlatform,
+        PerformanceSettingsPanel,
+        getPerformanceManager,
+      } from '../dist/index.js';
+
+      const platform = await RealtimeDashboardPlatform.create({
+        endpoints: {
+          websocket: 'wss://echo.websocket.events',
+          sse: '',
+          polling: '',
+        },
+        devMode: true,
+        storageKey: 'demo-metrics',
+      });
+
+      await platform.init();
+
+      new PerformanceSettingsPanel({
+        manager: getPerformanceManager(),
+        title: 'Performance',
+      });
+
+      const metricsEl = document.getElementById('metrics');
+      const statusEl = document.getElementById('status');
+
+      platform.runtime.scheduler.onUiFlush((latest) => {
+        if (latest && metricsEl) {
+          metricsEl.textContent = JSON.stringify(latest);
+        }
+        statusEl.textContent = JSON.stringify(platform.getSnapshot(), null, 2);
+      });
+
+      setInterval(() => {
+        platform.runtime.scheduler.pushNetworkUpdate({
+          cpu: Math.round(10 + Math.random() * 80),
+          ram: Math.round(30 + Math.random() * 50),
+          t: Date.now(),
+        });
+      }, 150);
+
+      document.documentElement.classList.add('theme-cyberpunk');
+    </script>
+  </body>
+</html>

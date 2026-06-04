@@ -1,0 +1,21 @@
+{
+  "name": "pc-monitor-mvp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PC metrics MVP — desktop agent, backend, realtime dashboard",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:raw": "concurrently -n server,agent,dashboard -c blue,green,magenta \"npm run dev -w server\" \"npm run dev -w agent\" \"npm run dev -w dashboard\"",
+    "build": "npm run build -w dashboard",
+    "start": "concurrently -n server,agent,dashboard \"npm run start -w server\" \"npm run start -w agent\" \"npm run start -w dashboard\""
+  },
+  "workspaces": [
+    "server",
+    "agent",
+    "dashboard"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
