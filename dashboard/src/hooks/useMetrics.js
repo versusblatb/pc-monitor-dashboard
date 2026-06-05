@@ -85,6 +85,9 @@ export function useMetrics() {
             if (msg.payload.lastSeen) setLastSeen(msg.payload.lastSeen);
           }
           if (msg.type === 'status') applyPayload(msg.payload);
+          if (msg.type === 'command_update' && msg.payload?.command) {
+            window.dispatchEvent(new CustomEvent('pcm-command-update', { detail: msg.payload.command }));
+          }
         } catch {
           /* ignore */
         }

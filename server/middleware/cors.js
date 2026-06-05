@@ -12,7 +12,11 @@ export function corsOrigin(req) {
 
 /** @param {import('http').IncomingMessage} req @param {import('http').ServerResponse} res */
 export function setCors(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', corsOrigin(req));
+  const origin = corsOrigin(req);
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Config-Key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Config-Key, X-CSRF-Token');
+  if (origin !== '*') {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 }

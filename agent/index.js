@@ -4,13 +4,10 @@ import {
   AGENT_VERSION,
   DUPLICATE_AGENT_DELAY_MS,
   FAST_INTERVAL_MS,
-  MEDIUM_INTERVAL_MS,
   RECONNECT_BASE_MS,
   RECONNECT_MAX_MS,
   SCHEMA_VERSION,
   SERVER_URL,
-  SLOW_INTERVAL_MS,
-  STATIC_REFRESH_MS,
 } from './config.js';
 import { buildPayload } from './build-payload.js';
 import { withCollectorLock } from './lib/collector-lock.js';
@@ -27,6 +24,8 @@ import {
 } from './collectors/fast.js';
 import { collectDisks, collectNetwork } from './collectors/medium.js';
 import { collectProcesses } from './collectors/slow.js';
+import { buildAgentAuthMessage } from './lib/auth.js';
+import { createCommandExecutor } from './commands/executor.js';
 
 /** @type {ReturnType<typeof setInterval>[]} */
 const timers = [];
@@ -34,6 +33,9 @@ let reconnectAttempt = 0;
 let shuttingDown = false;
 let connectDiagLogged = false;
 let schedulerTick = 0;
+let authenticated = false;
+/** @type {string|null} */
+let deviceId = null;
 
 function clearTimers() {
   for (const t of timers) clearInterval(t);
@@ -122,6 +124,8 @@ function logConnectDiagnostics(ws) {
       schemaVersion: SCHEMA_VERSION,
       agentVersion: AGENT_VERSION,
       hostname: payload.hostname,
+      deviceId,
+      authenticated,
       hasSystem: Boolean(state.system && Object.values(state.system).some((v) => v != null && v !== '')),
       hasCpu: state.cpu?.usage != null || state.cpu?.model != null,
       cpuCores: state.cpu?.physicalCores,
@@ -143,7 +147,7 @@ function logConnectDiagnostics(ws) {
 }
 
 function sendMetrics(ws) {
-  if (ws.readyState !== 1) return;
+  if (ws.readyState !== 1 || !authenticated) return;
   try {
     const payload = buildPayload(state);
     const message = createMetricsMessage(payload);
@@ -182,23 +186,57 @@ function connect() {
   if (shuttingDown) return;
 
   const ws = new WebSocket(SERVER_URL);
+  authenticated = false;
+  deviceId = null;
 
-  ws.on('open', async () => {
+  const executeCommand = createCommandExecutor(ws, {
+    deviceId: () => deviceId,
+    onInvalidSignature: (id) => console.warn('[agent] invalid command signature:', id),
+    onReplay: (id) => console.warn('[agent] replay rejected:', id),
+  });
+
+  ws.on('open', () => {
     reconnectAttempt = 0;
     connectDiagLogged = false;
     console.log('[agent] connected to', SERVER_URL);
-    sendMetrics(ws);
-    startCollectors(ws);
-    bootstrapCollectors()
-      .then(() => {
-        logConnectDiagnostics(ws);
-        sendMetrics(ws);
-      })
-      .catch(() => {});
+    ws.send(JSON.stringify(buildAgentAuthMessage()));
+  });
+
+  ws.on('message', async (raw) => {
+    try {
+      const msg = JSON.parse(String(raw));
+      if (msg.type === 'agent_auth_result') {
+        if (msg.payload?.ok) {
+          authenticated = true;
+          deviceId = msg.payload.deviceId ?? null;
+          console.log('[agent] authenticated, deviceId:', deviceId);
+          sendMetrics(ws);
+          startCollectors(ws);
+          bootstrapCollectors()
+            .then(() => {
+              logConnectDiagnostics(ws);
+              sendMetrics(ws);
+            })
+            .catch(() => {});
+        } else {
+          console.error('[agent] authentication failed');
+          ws.close();
+        }
+        return;
+      }
+      if (msg.type === 'remote_command') {
+        await executeCommand(msg);
+        return;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[agent] message error:', message);
+    }
   });
 
   ws.on('close', (code) => {
     clearTimers();
+    authenticated = false;
     if (shuttingDown) return;
 
     if (code === 4000) {

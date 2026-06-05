@@ -16,6 +16,17 @@ import { rateLimit } from './middleware/rate-limit.js';
 import { handleAlertsRoute } from './routes/alerts.js';
 import { handleApiRoute } from './routes/api.js';
 import { StatusResolver } from './status/status-resolver.js';
+import { CommandManager } from './commands/command-manager.js';
+import {
+  clearAgentState,
+  getAgentState,
+  handleAgentAuth,
+  initAgentConnection,
+  isAgentAuthenticated,
+} from './commands/agent-auth.js';
+import { handleCommandSessionRoute } from './routes/command-session.js';
+import { handleRemoteControlRoute } from './routes/remote-control.js';
+import { createCommandTelegramNotifier } from './commands/telegram-command-alerts.js';
 
 const PORT = Number(process.env.PORT) || 3847;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -35,6 +46,33 @@ const statusResolver = new StatusResolver();
 const history = new HistoryManager();
 const telegramConfig = new TelegramConfigStore();
 const alerts = new AlertManager(telegramConfig);
+const commands = new CommandManager();
+
+commands.dashboards = dashboards;
+commands.isAgentOnline = isAgentOnline;
+commands.getAgentInfo = () => {
+  if (!agentSocket) return null;
+  const state = getAgentState(agentSocket);
+  if (!state?.authenticated) return null;
+  return {
+    deviceId: state.deviceId,
+    hostname: state.hostname,
+    agentVersion: state.agentVersion,
+    capabilities: state.capabilities,
+  };
+};
+commands.onTelegramAlert = createCommandTelegramNotifier(async () => {
+  if (telegramConfig.isManagedByEnv()) {
+    return {
+      botToken: process.env.TELEGRAM_BOT_TOKEN,
+      chatId: process.env.TELEGRAM_CHAT_ID,
+    };
+  }
+  return telegramConfig.get();
+});
+
+/** @type {import('pg').Pool | null} */
+let pgPool = null;
 
 async function initPostgres() {
   const url = process.env.DATABASE_URL;
@@ -47,7 +85,9 @@ async function initPostgres() {
     });
     await history.initPostgres(pool);
     await telegramConfig.initPostgres(pool);
-    console.log('[server] PostgreSQL history + telegram config enabled');
+    await commands.initPostgres(pool);
+    pgPool = pool;
+    console.log('[server] PostgreSQL history + telegram + commands enabled');
     return pool;
   } catch (e) {
     console.error('[server] PostgreSQL unavailable, using memory store:', e.message);
@@ -70,6 +110,9 @@ async function initTelegramConfig() {
   } else if (alerts.configured) {
     console.log('[server] Telegram alerts loaded from saved config');
   }
+
+  const cmdAvail = commands.availability();
+  console.log('[server] remote commands:', cmdAvail.enabled ? 'enabled' : `disabled (${cmdAvail.reason})`);
 }
 
 function json(res, req, status, body) {
@@ -79,7 +122,9 @@ function json(res, req, status, body) {
 }
 
 function isAgentOnline() {
-  return agentSocket?.readyState === 1 && Date.now() - agentLastSeen < OFFLINE_TIMEOUT_MS;
+  return agentSocket?.readyState === 1
+    && isAgentAuthenticated(agentSocket)
+    && Date.now() - agentLastSeen < OFFLINE_TIMEOUT_MS;
 }
 
 function updateStatus() {
@@ -145,6 +190,8 @@ function logFirstV2Diagnostics(msg, normalized, incoming, rawBytes) {
 }
 
 function handleAgentMetrics(raw) {
+  if (!agentSocket || !isAgentAuthenticated(agentSocket)) return;
+
   try {
     validateIncomingSize(raw);
     const msg = JSON.parse(String(raw));
@@ -172,6 +219,56 @@ function handleAgentMetrics(raw) {
   }
 }
 
+/** @param {import('ws').WebSocket} ws @param {Buffer|string} raw */
+async function handleAgentMessage(ws, raw) {
+  try {
+    validateIncomingSize(raw);
+    const msg = JSON.parse(String(raw));
+
+    if (msg.type === 'agent_auth') {
+      const result = handleAgentAuth(ws, msg.payload);
+      ws.send(JSON.stringify({ type: 'agent_auth_result', payload: result }));
+      if (result.ok) {
+        commands.agentSocket = ws;
+        agentLastSeen = Date.now();
+        await commands.onAgentReconnect(ws);
+        updateStatus();
+        broadcastStatus();
+      }
+      return;
+    }
+
+    if (!isAgentAuthenticated(ws)) return;
+
+    if (msg.type === 'metrics') {
+      handleAgentMetrics(raw);
+      return;
+    }
+
+    if (msg.type === 'command_ack') {
+      await commands.handleCommandAck(msg.payload);
+      return;
+    }
+
+    if (msg.type === 'command_result') {
+      await commands.handleCommandResult(msg.payload);
+      return;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[server] agent message error:', message);
+  }
+}
+
+function isCommandPostPath(pathname) {
+  return (
+    pathname === '/api/command-session/login' ||
+    pathname === '/api/command-session/logout' ||
+    pathname === '/api/remote-control/commands' ||
+    /^\/api\/remote-control\/commands\/[^/]+\/cancel$/.test(pathname)
+  );
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
 
@@ -189,7 +286,14 @@ const server = http.createServer(async (req, res) => {
       url.pathname === '/api/alerts/discover-chat' ||
       url.pathname === '/api/alerts/test');
 
-  if (req.method !== 'GET' && !isAlertsPost) {
+  const isCommandPost = req.method === 'POST' && isCommandPostPath(url.pathname);
+
+  const isCommandGet =
+    req.method === 'GET' &&
+    (url.pathname.startsWith('/api/command-session/') ||
+      url.pathname.startsWith('/api/remote-control/'));
+
+  if (req.method !== 'GET' && !isAlertsPost && !isCommandPost) {
     json(res, req, 405, { error: 'method not allowed' });
     return;
   }
@@ -200,6 +304,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/health' || url.pathname === '/health') {
+    const cmdAvail = commands.availability();
     json(res, req, 200, {
       ok: true,
       agentOnline: isAgentOnline(),
@@ -209,6 +314,7 @@ const server = http.createServer(async (req, res) => {
       status: deviceStatus,
       historyPoints: history.memory.size,
       telegram: alerts.configured,
+      commands: cmdAvail,
     });
     return;
   }
@@ -218,22 +324,34 @@ const server = http.createServer(async (req, res) => {
     if (handled) return;
   }
 
+  if (url.pathname.startsWith('/api/command-session/')) {
+    const handled = await handleCommandSessionRoute(req, res, url, commands, json);
+    if (handled) return;
+  }
+
+  if (url.pathname.startsWith('/api/remote-control/')) {
+    const handled = await handleRemoteControlRoute(req, res, url, commands, json);
+    if (handled) return;
+  }
+
   if (url.pathname === '/api/debug/metrics-shape' && process.env.DEBUG_METRICS === 'true') {
     json(res, req, 200, describeMetricsShape(latest));
     return;
   }
 
-  const api = await handleApiRoute(url, {
-    isAgentOnline,
-    latest,
-    agentLastSeen,
-    status: deviceStatus,
-    history,
-  });
+  if (!isCommandGet) {
+    const api = await handleApiRoute(url, {
+      isAgentOnline,
+      latest,
+      agentLastSeen,
+      status: deviceStatus,
+      history,
+    });
 
-  if (api) {
-    json(res, req, api.status, api.body);
-    return;
+    if (api) {
+      json(res, req, api.status, api.body);
+      return;
+    }
   }
 
   if (url.pathname === '/api/stream') {
@@ -270,12 +388,17 @@ wss.on('connection', (ws, req) => {
       return;
     }
     agentSocket = ws;
+    initAgentConnection(ws);
     agentLastSeen = Date.now();
-    updateStatus();
-    console.log('[server] agent connected');
-    ws.on('message', handleAgentMetrics);
+    commands.agentSocket = ws;
+    console.log('[server] agent connected (awaiting auth)');
+    ws.on('message', (raw) => handleAgentMessage(ws, raw));
     ws.on('close', () => {
-      if (agentSocket === ws) agentSocket = null;
+      if (agentSocket === ws) {
+        agentSocket = null;
+        commands.agentSocket = null;
+      }
+      clearAgentState(ws);
       console.log('[server] agent disconnected');
       updateStatus();
       broadcastStatus();
@@ -284,6 +407,7 @@ wss.on('connection', (ws, req) => {
   }
 
   dashboards.add(ws);
+  commands.dashboards = dashboards;
   console.log('[server] dashboard connected', dashboards.size);
 
   ws.send(
@@ -308,6 +432,8 @@ setInterval(() => {
   const prev = deviceStatus;
   updateStatus();
   history.flushPending();
+  commands.expireStaleCommands().catch(() => {});
+  commands.audit.prune().catch(() => {});
   if (deviceStatus !== prev || !isAgentOnline()) broadcastStatus();
 }, 3000);
 

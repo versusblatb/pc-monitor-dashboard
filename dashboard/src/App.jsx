@@ -11,6 +11,7 @@ import { Storage } from './pages/Storage.jsx';
 import { Network } from './pages/Network.jsx';
 import { HistoryPage } from './pages/HistoryPage.jsx';
 import { Settings } from './pages/Settings.jsx';
+import { RemoteControl } from './pages/RemoteControl.jsx';
 import { useI18n } from './i18n/I18nProvider.jsx';
 import './App.css';
 import './themes/themes.css';
@@ -34,6 +35,7 @@ function DashboardRoutes() {
         <Route path="storage" element={<Storage {...common} />} />
         <Route path="network" element={<Network {...common} online={ctx.online} />} />
         <Route path="settings" element={<Settings metrics={ctx.metrics} online={ctx.online} />} />
+        <Route path="remote-control" element={<RemoteControl />} />
         <Route path="history" element={<HistoryPage />} />
       </Route>
       <Route

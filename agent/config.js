@@ -22,3 +22,14 @@ export const TOP_PROCESSES = 10;
 export const RECONNECT_BASE_MS = Number(process.env.RECONNECT_BASE_MS) || 1000;
 export const RECONNECT_MAX_MS = Number(process.env.RECONNECT_MAX_MS) || 60_000;
 export const DUPLICATE_AGENT_DELAY_MS = 30_000;
+
+export const AGENT_AUTH_TOKEN = process.env.AGENT_AUTH_TOKEN || '';
+export const COMMAND_SIGNING_SECRET = process.env.COMMAND_SIGNING_SECRET || '';
+export const ALLOW_REMOTE_COMMANDS = process.env.ALLOW_REMOTE_COMMANDS === 'true';
+export const ALLOW_SCREENSHOT = process.env.ALLOW_SCREENSHOT === 'true';
+export const APPS_CONFIG_PATH = process.env.APPS_CONFIG_PATH || './config/apps.json';
+export const SCREENSHOT_TTL_MS = 2 * 60_000;
+
+export const COMMAND_EXECUTION_MODE =
+  process.env.COMMAND_EXECUTION_MODE ||
+  (process.env.NODE_ENV === 'production' ? 'real' : 'mock');

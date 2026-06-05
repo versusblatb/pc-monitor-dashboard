@@ -29,7 +29,10 @@ export function apiUrl(path) {
 }
 
 export async function apiFetch(path, opts = {}) {
-  const res = await fetch(apiUrl(path), opts);
+  const res = await fetch(apiUrl(path), {
+    credentials: opts.credentials ?? 'same-origin',
+    ...opts,
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -69,5 +72,20 @@ export const api = {
     apiFetch('/api/alerts/test', {
       method: 'POST',
       headers: configHeaders(configKey),
+    }),
+  commandSessionStatus: () =>
+    apiFetch('/api/command-session/status', { credentials: 'include' }),
+  commandSessionLogin: (password) =>
+    apiFetch('/api/command-session/login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    }),
+  commandSessionLogout: () =>
+    apiFetch('/api/command-session/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
     }),
 };

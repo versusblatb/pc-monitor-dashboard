@@ -57,10 +57,59 @@ DATABASE_URL=postgres://... npm run migrate -w server
 2. Get chat id → `TELEGRAM_CHAT_ID`
 3. Render env: `TELEGRAM_ALERTS_ENABLED=true`
 
+## Remote control (optional, disabled by default)
+
+Whitelist-only commands: Lock, Sleep, Hibernate, Shutdown, Restart, Launch/Stop approved apps, Clear temp, Screenshot.
+
+**Security:** no arbitrary shell; HMAC-signed commands; agent token via `agent_auth` message; operator password session.
+
+### Generate secrets
+
+```bash
+# Command admin password hash (Render: COMMAND_ADMIN_PASSWORD_HASH)
+npm run hash-command-password -w server -- "your-strong-password"
+
+# Agent token + signing secret (use openssl or Node crypto random bytes)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### Render env
+
+```
+COMMANDS_ENABLED=true
+COMMAND_ADMIN_PASSWORD_HASH=<scrypt hash>
+COMMAND_SESSION_SECRET=<random>
+COMMAND_SIGNING_SECRET=<random>
+AGENT_AUTH_TOKEN=<random>
+DATABASE_URL=<required in production>
+TELEGRAM_COMMAND_ALERTS_ENABLED=true
+```
+
+### Agent env (`agent/.env.example`)
+
+```
+AGENT_AUTH_TOKEN=<same as Render>
+COMMAND_SIGNING_SECRET=<same as Render>
+ALLOW_REMOTE_COMMANDS=true
+ALLOW_SCREENSHOT=false
+COMMAND_EXECUTION_MODE=mock
+```
+
+### Mock mode (safe local testing)
+
+Set `COMMAND_EXECUTION_MODE=mock` on the agent — power commands return success without executing.
+
+Emergency disable: `COMMANDS_ENABLED=false` on Render, or create `agent/data/disable-remote-control`.
+
+Dashboard: `/remote-control` — requires command session login.
+
+See `docs/REMOTE_CONTROL_SECURITY.md` and `docs/REMOTE_CONTROL_PLAN.md`.
+
 ## Tests
 
 ```bash
 npm test -w server
+npm test -w agent
 npm test -w dashboard
 npm run build -w dashboard
 ```

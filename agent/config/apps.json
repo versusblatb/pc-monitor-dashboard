@@ -1,0 +1,11 @@
+{
+  "apps": [
+    {
+      "id": "notepad",
+      "label": "Notepad",
+      "executable": "C:\\Windows\\System32\\notepad.exe",
+      "args": [],
+      "allowStop": true
+    }
+  ]
+}

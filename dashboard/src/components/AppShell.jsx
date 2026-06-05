@@ -12,6 +12,7 @@ const NAV = [
   ['/network', 'nav.network'],
   ['/history', 'nav.history'],
   ['/settings', 'nav.settings'],
+  ['/remote-control', 'nav.remoteControl'],
 ];
 
 export function AppShell({ hostname, online, status, wsConnected }) {
