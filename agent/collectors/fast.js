@@ -1,7 +1,10 @@
 import os from 'node:os';
 import si from 'systeminformation';
 import { getCpuPercent, getGpuInfo, getRamStats, warmupCpuBaseline } from '../metrics.js';
+import { getCpuOsInfo } from '../lib/os-fallbacks.js';
 import { safeBlock, numOrNull, roundPct } from '../lib/safe.js';
+
+const CPU_OS = getCpuOsInfo();
 
 const EMPTY_CPU = {
   usage: null,
@@ -31,6 +34,19 @@ const EMPTY_MEMORY = {
 
 export { warmupCpuBaseline };
 
+/** @param {Record<string, unknown>} partial */
+function mergeCpuStatic(partial) {
+  return {
+    ...EMPTY_CPU,
+    ...CPU_OS,
+    ...partial,
+    model: partial.model ?? CPU_OS.model,
+    physicalCores: partial.physicalCores ?? CPU_OS.physicalCores,
+    logicalCores: partial.logicalCores ?? CPU_OS.logicalCores,
+    frequencyMhz: partial.frequencyMhz ?? CPU_OS.frequencyMhz,
+  };
+}
+
 /** @returns {Promise<typeof EMPTY_CPU>} */
 export async function collectCpu() {
   return safeBlock(
@@ -43,21 +59,21 @@ export async function collectCpu() {
 
       const legacy = getCpuPercent();
       const usage = roundPct(load?.currentLoad) ?? legacy;
-
       const temps = temp?.main != null ? temp.main : temp?.max;
-      const freq = cpu?.speed != null ? Math.round(cpu.speed * 1000) : null;
+      const freq = cpu?.speed != null ? Math.round(cpu.speed * 1000) : CPU_OS.frequencyMhz;
 
-      return {
+      return mergeCpuStatic({
         usage,
         temperature: numOrNull(temps),
-        model: cpu?.brand || null,
-        physicalCores: numOrNull(cpu?.physicalCores) ?? os.cpus().length,
-        logicalCores: numOrNull(cpu?.cores) ?? os.cpus().length,
+        model: cpu?.brand || CPU_OS.model,
+        physicalCores: numOrNull(cpu?.physicalCores) ?? CPU_OS.physicalCores,
+        logicalCores: numOrNull(cpu?.cores) ?? CPU_OS.logicalCores,
         frequencyMhz: freq,
-      };
+      });
     },
-    { ...EMPTY_CPU, usage: getCpuPercent() },
+    mergeCpuStatic({ usage: getCpuPercent() }),
     'cpu',
+    10000,
   );
 }
 
@@ -106,6 +122,7 @@ export async function collectGpu() {
       available: getGpuInfo().gpuAvailable,
     },
     'gpu',
+    10000,
   );
 }
 
@@ -123,7 +140,7 @@ export async function collectMemory() {
 
       const total = numOrNull(mem?.total) ?? Math.round(legacy.ramTotalGb * 1024 ** 3);
       const used = numOrNull(mem?.used) ?? Math.round(legacy.ramUsedGb * 1024 ** 3);
-      const usedPercent = roundPct(mem?.used / mem?.total * 100) ?? legacy.ram;
+      const usedPercent = roundPct((mem?.used / mem?.total) * 100) ?? legacy.ram;
 
       return {
         usedPercent,
@@ -141,6 +158,7 @@ export async function collectMemory() {
       totalGb: getRamStats().ramTotalGb,
     },
     'memory',
+    8000,
   );
 }
 
@@ -153,6 +171,6 @@ export async function collectUptime() {
     },
     numOrNull(os.uptime()),
     'uptime',
-    2000,
+    3000,
   );
 }

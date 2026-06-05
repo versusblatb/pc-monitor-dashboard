@@ -13,20 +13,22 @@ export function Network({ metrics, online }) {
   const n = metrics?.network ?? {};
   const ctx = { online, metrics };
 
-  const row = (label, raw, display = raw) => {
-    const state = resolveMetricState(raw, ctx, { requireV2: true });
+  const row = (label, raw, display = raw, pending = true) => {
+    const state = resolveMetricState(raw, ctx, { requireV2: true, pendingIfOnline: pending });
     const value = display != null && state === 'value' ? display : formatMetricValue(display, state, t);
     return [label, value, state];
   };
+
+  const bpsPending = online && Boolean(n.interface) && n.downloadBps == null && n.uploadBps == null;
 
   const rows = [
     row(t('network.interface'), n.interface),
     row(t('network.type'), n.type),
     row(t('network.ipv4'), n.ipv4),
-    row(t('network.download'), n.downloadBps, fmtBps(n.downloadBps)),
-    row(t('network.upload'), n.uploadBps, fmtBps(n.uploadBps)),
-    row(t('network.ping'), n.pingMs, n.pingMs != null ? `${n.pingMs} ms` : null),
-    row(t('network.linkSpeed'), n.linkSpeedMbps, n.linkSpeedMbps != null ? `${n.linkSpeedMbps} Mbps` : null),
+    row(t('network.download'), n.downloadBps, fmtBps(n.downloadBps), bpsPending),
+    row(t('network.upload'), n.uploadBps, fmtBps(n.uploadBps), bpsPending),
+    row(t('network.ping'), n.pingMs, n.pingMs != null ? `${n.pingMs} ms` : null, false),
+    row(t('network.linkSpeed'), n.linkSpeedMbps, n.linkSpeedMbps != null ? `${n.linkSpeedMbps} Mbps` : null, false),
   ];
 
   return (

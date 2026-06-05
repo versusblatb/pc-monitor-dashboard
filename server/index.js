@@ -117,7 +117,7 @@ function broadcastStatus() {
 
 let firstV2DiagLogged = false;
 
-function logFirstV2Diagnostics(msg, normalized, incoming) {
+function logFirstV2Diagnostics(msg, normalized, incoming, rawBytes) {
   if (firstV2DiagLogged || normalized.schemaVersion < 2) return;
   firstV2DiagLogged = true;
 
@@ -138,7 +138,7 @@ function logFirstV2Diagnostics(msg, normalized, incoming) {
     topLevelKeys: topKeys,
     validation: 'ok',
     normalizedSections: sections,
-    payloadBytes: Buffer.byteLength(String(raw), 'utf8'),
+    payloadBytes: rawBytes,
     agentVersion: incoming.agentVersion ?? null,
     hostname: incoming.hostname ?? null,
   });
@@ -161,7 +161,7 @@ function handleAgentMetrics(raw) {
     latest = mergeClientMetrics(latest, incoming);
     agentLastSeen = Date.now();
 
-    logFirstV2Diagnostics(msg, normalized, incoming);
+    logFirstV2Diagnostics(msg, normalized, incoming, Buffer.byteLength(String(raw), 'utf8'));
 
     const { status } = updateStatus();
     history.onMetrics(latest, status);

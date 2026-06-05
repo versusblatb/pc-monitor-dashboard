@@ -1,5 +1,7 @@
 import si from 'systeminformation';
 import { getDisksWindows } from '../metrics.js';
+import { getNetworkBpsWindows } from '../lib/network-bps.js';
+import { getNetworkOsInfo } from '../lib/os-fallbacks.js';
 import { safeBlock, numOrNull, roundPct } from '../lib/safe.js';
 
 const EMPTY_NETWORK = {
@@ -14,6 +16,31 @@ const EMPTY_NETWORK = {
   linkSpeedMbps: null,
 };
 
+/** @param {Record<string, unknown>} partial */
+function mergeNetworkOs(partial) {
+  const osNet = getNetworkOsInfo();
+  const iface = partial.interface ?? osNet?.interface ?? null;
+  const bps =
+    partial.downloadBps == null && partial.uploadBps == null
+      ? getNetworkBpsWindows(iface)
+      : { downloadBps: null, uploadBps: null, pingMs: null };
+
+  if (!osNet && !iface) return { ...EMPTY_NETWORK, ...partial, ...bps };
+
+  return {
+    ...EMPTY_NETWORK,
+    interface: iface,
+    ipv4: partial.ipv4 ?? osNet?.ipv4 ?? null,
+    type: partial.type ?? osNet?.type ?? null,
+    linkSpeedMbps: partial.linkSpeedMbps ?? osNet?.linkSpeedMbps ?? null,
+    downloadBps: partial.downloadBps ?? bps.downloadBps,
+    uploadBps: partial.uploadBps ?? bps.uploadBps,
+    totalDownloaded: partial.totalDownloaded ?? null,
+    totalUploaded: partial.totalUploaded ?? null,
+    pingMs: partial.pingMs ?? bps.pingMs ?? null,
+  };
+}
+
 /** @returns {Promise<typeof EMPTY_NETWORK>} */
 export async function collectNetwork() {
   return safeBlock(
@@ -25,7 +52,7 @@ export async function collectNetwork() {
         si.inetLatency().catch(() => null),
       ]);
 
-      const defaultName = def || null;
+      const defaultName = def || getNetworkOsInfo()?.interface || null;
       const activeStat =
         (Array.isArray(stats) ? stats : []).find((s) => s.iface === defaultName) ||
         (Array.isArray(stats) ? stats.find((s) => !s.iface?.toLowerCase().includes('loopback')) : null);
@@ -36,7 +63,7 @@ export async function collectNetwork() {
 
       const pingMs = numOrNull(ping);
 
-      return {
+      return mergeNetworkOs({
         interface: defaultName,
         ipv4: activeIface?.ip4 || null,
         downloadBps: numOrNull(activeStat?.rx_sec),
@@ -46,11 +73,11 @@ export async function collectNetwork() {
         pingMs,
         type: activeIface?.type || null,
         linkSpeedMbps: numOrNull(activeIface?.speed),
-      };
+      });
     },
-    { ...EMPTY_NETWORK },
+    mergeNetworkOs({}),
     'network',
-    5000,
+    10000,
   );
 }
 
@@ -83,13 +110,12 @@ export async function collectDisks() {
         writeBps: null,
         loadPct: null,
         smartStatus: null,
-        // legacy compat fields
         usedPct: roundPct(d.use),
       }));
     },
     process.platform === 'win32' ? getDisksWindows().map(mapLegacyDisk) : [],
     'disks',
-    6000,
+    8000,
   );
 }
 

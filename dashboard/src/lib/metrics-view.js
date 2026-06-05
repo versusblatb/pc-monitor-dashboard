@@ -12,8 +12,19 @@ export function resolveMetricState(value, ctx, opts = {}) {
   if (!online && metrics == null) return 'loading';
   if (!online && metrics != null) return 'unavailable';
   if (opts.requireV2 && schemaVersion != null && schemaVersion < 2) return 'legacy';
-  if (value === null || value === undefined || value === '') return 'unavailable';
+  if (value === null || value === undefined || value === '') {
+    if (online && metrics && opts.pendingIfOnline) return 'pending';
+    return 'unavailable';
+  }
   return 'value';
+}
+
+/**
+ * @param {Record<string, unknown>|null|undefined} section
+ */
+export function sectionHasData(section) {
+  if (!section || typeof section !== 'object') return false;
+  return Object.values(section).some((v) => v !== null && v !== undefined && v !== '');
 }
 
 /**

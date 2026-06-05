@@ -28,12 +28,12 @@ export function Hardware({ metrics, online }) {
       cpu.physicalCores != null
         ? t('hardware.coresFmt', { phys: cpu.physicalCores, log: cpu.logicalCores })
         : null,
-      { requireV2: true },
+      { requireV2: true, pendingIfOnline: true },
     ),
     row(
       t('hardware.frequency'),
       cpu.frequencyMhz != null ? `${cpu.frequencyMhz} MHz` : null,
-      { requireV2: true },
+      { requireV2: true, pendingIfOnline: true },
     ),
     row(t('metrics.gpu'), gpu.model ?? metrics?.gpuName, { requireV2: true }),
     row(
