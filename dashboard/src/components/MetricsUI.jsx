@@ -1,4 +1,5 @@
 import { useI18n } from '../i18n/I18nProvider.jsx';
+import { formatDiskPercent } from '../lib/format-metrics.js';
 
 function MetricBar({ value, color, label }) {
   const v = Math.min(100, Math.max(0, value ?? 0));
@@ -9,7 +10,7 @@ function MetricBar({ value, color, label }) {
   );
 }
 
-function MetricCard({ label, value, unit = '%', sub, color, accent, children }) {
+function MetricCard({ label, display, sub, color, accent, children }) {
   return (
     <article className="metric-card" style={{ '--accent': accent }}>
       <div className="metric-card__head">
@@ -17,8 +18,7 @@ function MetricCard({ label, value, unit = '%', sub, color, accent, children }) 
         <span className="metric-card__label">{label}</span>
       </div>
       <div className="metric-card__value">
-        <span className="metric-card__num">{value ?? '—'}</span>
-        {value != null && <span className="metric-card__unit">{unit}</span>}
+        <span className="metric-card__num">{display ?? '—'}</span>
       </div>
       {sub && <p className="metric-card__sub">{sub}</p>}
       {children}
@@ -40,11 +40,11 @@ function DiskCard({ disk }) {
       </div>
       <div className="disk-card__stats">
         <div>
-          <span className="disk-card__pct">{usedPct ?? '—'}%</span>
+          <span className="disk-card__pct">{formatDiskPercent(usedPct)}</span>
           <span className="disk-card__hint">{t('disks.used')}</span>
         </div>
         <div>
-          <span className="disk-card__pct">{disk.loadPct ?? 0}%</span>
+          <span className="disk-card__pct">{formatDiskPercent(disk.loadPct)}</span>
           <span className="disk-card__hint">{t('disks.load')}</span>
         </div>
       </div>

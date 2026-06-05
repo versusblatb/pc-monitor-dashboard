@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { formatPercent } from '../lib/format-metrics.js';
 import { useI18n } from '../i18n/I18nProvider.jsx';
 import { metricHint, resolveProcessesState } from '../lib/metrics-view.js';
 
@@ -49,8 +50,8 @@ export function Processes({ metrics, online }) {
                 <tr key={p.pid}>
                   <td>{p.name}</td>
                   <td>{p.pid}</td>
-                  <td>{p.cpu ?? '—'}</td>
-                  <td>{p.memoryPercent ?? '—'}</td>
+                <td>{formatPercent(p.cpu)}</td>
+                <td>{formatPercent(p.memoryPercent)}</td>
                 </tr>
               ))}
             </tbody>

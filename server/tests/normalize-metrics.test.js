@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeAgentMessage,
+  normalizeV2Payload,
   toClientPayload,
 } from '../lib/normalize-metrics.js';
 
@@ -75,5 +76,14 @@ describe('normalizeAgentMessage', () => {
     assert.equal(client.schemaVersion, 2);
     assert.ok(client.cpuInfo);
     assert.ok(client.system);
+  });
+
+  it('validates floating CPU temperature in v2 payload', () => {
+    const { cpu } = normalizeV2Payload({
+      cpu: { usage: 10, temperature: 20.466666666666667 },
+    });
+
+    assert.equal(cpu.temperature, 20.5);
+    assert.equal(cpu.usage, 10);
   });
 });

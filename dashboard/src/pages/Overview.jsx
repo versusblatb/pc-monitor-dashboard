@@ -1,5 +1,10 @@
 import { MetricBar, MetricCard, DiskCard, ChartLegend } from '../components/MetricsUI.jsx';
 import { LiveChart } from '../components/LiveChart.jsx';
+import {
+  formatPercent,
+  formatPrimaryTemperature,
+  formatTemperatureSubtitle,
+} from '../lib/format-metrics.js';
 import { useI18n } from '../i18n/I18nProvider.jsx';
 
 export function Overview({ metrics, history, online, status, lastSeen, wsConnected, stale }) {
@@ -8,7 +13,6 @@ export function Overview({ metrics, history, online, status, lastSeen, wsConnect
   const cpuTemp = metrics?.cpuInfo?.temperature;
   const gpuTemp = metrics?.gpuInfo?.temperature;
   const statusLabel = t(`status.${status}`) !== `status.${status}` ? t(`status.${status}`) : status;
-
   return (
     <>
       {!online && (
@@ -30,18 +34,40 @@ export function Overview({ metrics, history, online, status, lastSeen, wsConnect
         </span>
       </div>
       <section className="metrics-grid">
-        <MetricCard label={t('metrics.cpu')} value={metrics?.cpu} sub={metrics?.cpuInfo?.model ?? t('metrics.processor')} color="#00e5ff" accent="rgba(0,229,255,0.12)">
+        <MetricCard
+          label={t('metrics.cpu')}
+          display={formatPercent(metrics?.cpu)}
+          sub={metrics?.cpuInfo?.model ?? t('metrics.processor')}
+          color="#00e5ff"
+          accent="rgba(0,229,255,0.12)"
+        >
           <MetricBar value={metrics?.cpu} color="#00e5ff" label={t('metrics.cpu')} />
         </MetricCard>
-        <MetricCard label={t('metrics.gpu')} value={metrics?.gpuAvailable !== false ? metrics?.gpu : '—'} sub={metrics?.gpuName ?? metrics?.gpuInfo?.model ?? t('metrics.gpuCard')} color="#ffb020" accent="rgba(255,176,32,0.12)">
+        <MetricCard
+          label={t('metrics.gpu')}
+          display={metrics?.gpuAvailable !== false ? formatPercent(metrics?.gpu) : '—'}
+          sub={metrics?.gpuName ?? metrics?.gpuInfo?.model ?? t('metrics.gpuCard')}
+          color="#ffb020"
+          accent="rgba(255,176,32,0.12)"
+        >
           <MetricBar value={metrics?.gpu} color="#ffb020" label={t('metrics.gpu')} />
         </MetricCard>
-        <MetricCard label={t('metrics.ram')} value={metrics?.ram} sub={metrics?.ramUsedGb != null ? `${metrics.ramUsedGb} / ${metrics.ramTotalGb} GB` : t('metrics.memory')} color="#7a5cff" accent="rgba(122,92,255,0.12)">
+        <MetricCard
+          label={t('metrics.ram')}
+          display={formatPercent(metrics?.ram)}
+          sub={metrics?.ramUsedGb != null ? `${metrics.ramUsedGb} / ${metrics.ramTotalGb} GB` : t('metrics.memory')}
+          color="#7a5cff"
+          accent="rgba(122,92,255,0.12)"
+        >
           <MetricBar value={metrics?.ram} color="#7a5cff" label={t('metrics.ram')} />
         </MetricCard>
-        {(cpuTemp != null || gpuTemp != null) && (
-          <MetricCard label={t('metrics.temp')} value={cpuTemp ?? gpuTemp} unit="°C" sub={`CPU ${cpuTemp ?? '—'} · GPU ${gpuTemp ?? '—'}`} color="#f85149" accent="rgba(248,81,73,0.12)" />
-        )}
+        <MetricCard
+          label={t('metrics.temp')}
+          display={formatPrimaryTemperature(cpuTemp, gpuTemp)}
+          sub={formatTemperatureSubtitle(cpuTemp, gpuTemp)}
+          color="#f85149"
+          accent="rgba(248,81,73,0.12)"
+        />
       </section>
       {disks.length > 0 && (
         <section className="disks-section">

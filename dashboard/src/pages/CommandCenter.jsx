@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useMetrics } from '../hooks/useMetrics.js';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { MetricBar } from '../components/MetricsUI.jsx';
+import {
+  formatDiskPercent,
+  formatNetworkSpeed,
+  formatPercent,
+  formatTemperature,
+} from '../lib/format-metrics.js';
 import { useI18n } from '../i18n/I18nProvider.jsx';
 import '../command-center.css';
 
@@ -69,14 +75,14 @@ export function CommandCenter() {
       </header>
 
       <div className="cc-grid">
-        <div className="cc-metric"><span className="cc-label">{t('metrics.cpu')}</span><span className="cc-value">{metrics?.cpu ?? '—'}%</span><MetricBar value={metrics?.cpu} color="#00e5ff" label={t('metrics.cpu')} /></div>
-        <div className="cc-metric"><span className="cc-label">{t('metrics.gpu')}</span><span className="cc-value">{metrics?.gpu ?? '—'}%</span><MetricBar value={metrics?.gpu} color="#ffb020" label={t('metrics.gpu')} /></div>
-        <div className="cc-metric"><span className="cc-label">{t('metrics.ram')}</span><span className="cc-value">{metrics?.ram ?? '—'}%</span><MetricBar value={metrics?.ram} color="#7a5cff" label={t('metrics.ram')} /></div>
-        <div className="cc-metric"><span className="cc-label">{t('metrics.cpu')} °C</span><span className="cc-value">{cpuTemp ?? '—'}</span></div>
-        <div className="cc-metric"><span className="cc-label">{t('metrics.gpu')} °C</span><span className="cc-value">{gpuTemp ?? '—'}</span></div>
-        <div className="cc-metric"><span className="cc-label">{t('monitorMode.diskC')}</span><span className="cc-value">{disk?.usedPct ?? disk?.usedPercent ?? '—'}%</span></div>
-        <div className="cc-metric"><span className="cc-label">{t('monitorMode.netDown')}</span><span className="cc-value cc-small">{formatBps(metrics?.network?.downloadBps)}</span></div>
-        <div className="cc-metric"><span className="cc-label">{t('monitorMode.netUp')}</span><span className="cc-value cc-small">{formatBps(metrics?.network?.uploadBps)}</span></div>
+        <div className="cc-metric"><span className="cc-label">{t('metrics.cpu')}</span><span className="cc-value">{formatPercent(metrics?.cpu)}</span><MetricBar value={metrics?.cpu} color="#00e5ff" label={t('metrics.cpu')} /></div>
+        <div className="cc-metric"><span className="cc-label">{t('metrics.gpu')}</span><span className="cc-value">{formatPercent(metrics?.gpu)}</span><MetricBar value={metrics?.gpu} color="#ffb020" label={t('metrics.gpu')} /></div>
+        <div className="cc-metric"><span className="cc-label">{t('metrics.ram')}</span><span className="cc-value">{formatPercent(metrics?.ram)}</span><MetricBar value={metrics?.ram} color="#7a5cff" label={t('metrics.ram')} /></div>
+        <div className="cc-metric"><span className="cc-label">{t('metrics.cpu')} °C</span><span className="cc-value">{formatTemperature(cpuTemp)}</span></div>
+        <div className="cc-metric"><span className="cc-label">{t('metrics.gpu')} °C</span><span className="cc-value">{formatTemperature(gpuTemp)}</span></div>
+        <div className="cc-metric"><span className="cc-label">{t('monitorMode.diskC')}</span><span className="cc-value">{formatDiskPercent(disk?.usedPct ?? disk?.usedPercent)}</span></div>
+        <div className="cc-metric"><span className="cc-label">{t('monitorMode.netDown')}</span><span className="cc-value cc-small">{formatNetworkSpeed(metrics?.network?.downloadBps)}</span></div>
+        <div className="cc-metric"><span className="cc-label">{t('monitorMode.netUp')}</span><span className="cc-value cc-small">{formatNetworkSpeed(metrics?.network?.uploadBps)}</span></div>
       </div>
 
       <footer className="cc-footer">
@@ -93,8 +99,3 @@ export function CommandCenter() {
   );
 }
 
-function formatBps(v) {
-  if (v == null) return '—';
-  if (v < 1024 ** 2) return `${(v / 1024).toFixed(0)} KB/s`;
-  return `${(v / 1024 ** 2).toFixed(1)} MB/s`;
-}

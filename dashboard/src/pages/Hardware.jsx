@@ -1,4 +1,5 @@
 import { useI18n } from '../i18n/I18nProvider.jsx';
+import { formatFrequency } from '../lib/format-metrics.js';
 import { formatMetricValue, resolveMetricState } from '../lib/metrics-view.js';
 
 export function Hardware({ metrics, online }) {
@@ -32,7 +33,7 @@ export function Hardware({ metrics, online }) {
     ),
     row(
       t('hardware.frequency'),
-      cpu.frequencyMhz != null ? `${cpu.frequencyMhz} MHz` : null,
+      cpu.frequencyMhz != null ? formatFrequency(cpu.frequencyMhz) : null,
       { requireV2: true, pendingIfOnline: true },
     ),
     row(t('metrics.gpu'), gpu.model ?? metrics?.gpuName, { requireV2: true }),

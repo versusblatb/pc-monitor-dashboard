@@ -1,4 +1,10 @@
 import { mergeMetricsState } from './merge-metrics.js';
+import {
+  parseNumber,
+  validatePositiveNumber,
+  validateTemperature,
+  validateUsage,
+} from './metric-validation.js';
 
 const MAX_HOSTNAME_LEN = 64;
 const MAX_WS_BYTES = 128 * 1024;
@@ -106,14 +112,14 @@ function normalizeCpu(cpu) {
   if (!cpu || typeof cpu !== 'object') return null;
   const c = /** @type {Record<string, unknown>} */ (cpu);
   return {
-    usage: clampPct(c.usage ?? c.load),
-    temperature: numOrNull(c.temperature ?? c.temp),
+    usage: validateUsage(c.usage ?? c.load ?? c.currentLoad),
+    temperature: validateTemperature(c.temperature ?? c.temp ?? c.main),
     model: strOrNull(c.model ?? c.brand),
     manufacturer: strOrNull(c.manufacturer),
-    physicalCores: numOrNull(c.physicalCores ?? c.physical),
-    logicalCores: numOrNull(c.logicalCores ?? c.cores),
-    frequencyMhz: numOrNull(c.frequencyMhz ?? c.speed),
-    maxSpeedMhz: numOrNull(c.maxSpeedMhz ?? c.speedMax),
+    physicalCores: parseNumber(c.physicalCores ?? c.physical),
+    logicalCores: parseNumber(c.logicalCores ?? c.cores),
+    frequencyMhz: parseNumber(c.frequencyMhz ?? c.speed),
+    maxSpeedMhz: parseNumber(c.maxSpeedMhz ?? c.speedMax),
   };
 }
 
@@ -126,12 +132,12 @@ function normalizeGpu(gpu) {
       return normalizeGpu(g.controllers[0]);
     }
     return {
-      usage: clampPct(g.usage ?? g.utilizationGpu),
-      temperature: numOrNull(g.temperature ?? g.temperatureGpu),
+      usage: validateUsage(g.usage ?? g.utilizationGpu),
+      temperature: validateTemperature(g.temperature ?? g.temperatureGpu),
       model: strOrNull(g.model),
       vendor: strOrNull(g.vendor),
-      memoryUsedMb: numOrNull(g.memoryUsedMb ?? g.memoryUsed),
-      memoryTotalMb: numOrNull(g.memoryTotalMb ?? g.memoryTotal ?? g.vram),
+      memoryUsedMb: parseNumber(g.memoryUsedMb ?? g.memoryUsed),
+      memoryTotalMb: parseNumber(g.memoryTotalMb ?? g.memoryTotal ?? g.vram),
       available: Boolean(g.available ?? g.model ?? g.usage != null),
     };
   }
@@ -143,11 +149,11 @@ function normalizeMemory(mem) {
   if (!mem || typeof mem !== 'object') return null;
   const m = /** @type {Record<string, unknown>} */ (mem);
   return {
-    usedPercent: clampPct(m.usedPercent ?? m.usedPct ?? m.percent),
-    usedBytes: numOrNull(m.usedBytes ?? m.used),
-    totalBytes: numOrNull(m.totalBytes ?? m.total),
-    usedGb: numOrNull(m.usedGb),
-    totalGb: numOrNull(m.totalGb),
+    usedPercent: validateUsage(m.usedPercent ?? m.usedPct ?? m.percent),
+    usedBytes: validatePositiveNumber(m.usedBytes ?? m.used),
+    totalBytes: validatePositiveNumber(m.totalBytes ?? m.total),
+    usedGb: parseNumber(m.usedGb),
+    totalGb: parseNumber(m.totalGb),
   };
 }
 
@@ -163,13 +169,13 @@ function normalizeNetwork(net) {
   return {
     interface: strOrNull(n.interface ?? n.iface),
     ipv4: strOrNull(n.ipv4 ?? n.ip4),
-    downloadBps: numOrNull(n.downloadBps ?? n.rx_sec),
-    uploadBps: numOrNull(n.uploadBps ?? n.tx_sec),
-    totalDownloaded: numOrNull(n.totalDownloaded ?? n.rx_bytes),
-    totalUploaded: numOrNull(n.totalUploaded ?? n.tx_bytes),
-    pingMs: numOrNull(n.pingMs ?? n.latency),
+    downloadBps: validatePositiveNumber(n.downloadBps ?? n.rx_sec),
+    uploadBps: validatePositiveNumber(n.uploadBps ?? n.tx_sec),
+    totalDownloaded: validatePositiveNumber(n.totalDownloaded ?? n.rx_bytes),
+    totalUploaded: validatePositiveNumber(n.totalUploaded ?? n.tx_bytes),
+    pingMs: validatePositiveNumber(n.pingMs ?? n.latency),
     type: strOrNull(n.type),
-    linkSpeedMbps: numOrNull(n.linkSpeedMbps ?? n.speed),
+    linkSpeedMbps: validatePositiveNumber(n.linkSpeedMbps ?? n.speed),
   };
 }
 
@@ -183,7 +189,7 @@ function normalizeProcesses(proc) {
   const topMemory = Array.isArray(p.topMemory) ? p.topMemory : [];
 
   return {
-    total: numOrNull(p.total ?? p.all ?? (list ? list.length : null)),
+    total: parseNumber(p.total ?? p.all ?? (list ? list.length : null)),
     topCpu: topCpu.slice(0, 10),
     topMemory: topMemory.slice(0, 10),
   };
@@ -198,8 +204,8 @@ function normalizeDisks(disks) {
     return {
       ...disk,
       letter: disk.letter ?? disk.mount ?? null,
-      usedPct: disk.usedPct ?? disk.usedPercent ?? clampPct(disk.use),
-      usedPercent: disk.usedPercent ?? disk.usedPct ?? clampPct(disk.use),
+      usedPct: validateUsage(disk.usedPct ?? disk.usedPercent ?? disk.use),
+      usedPercent: validateUsage(disk.usedPercent ?? disk.usedPct ?? disk.use),
       totalGb: disk.totalGb ?? (disk.size ? Math.round(Number(disk.size) / 1024 ** 3 * 10) / 10 : null),
       usedGb: disk.usedGb ?? (disk.used ? Math.round(Number(disk.used) / 1024 ** 3 * 10) / 10 : null),
     };
@@ -290,15 +296,12 @@ export function validateIncomingSize(raw) {
 
 /** @param {unknown} v */
 function clampPct(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return null;
-  return Math.min(100, Math.max(0, Math.round(n)));
+  return validateUsage(v);
 }
 
 /** @param {unknown} v */
 function numOrNull(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+  return parseNumber(v);
 }
 
 /** @param {unknown} v */

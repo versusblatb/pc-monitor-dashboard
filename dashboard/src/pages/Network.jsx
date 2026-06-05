@@ -1,12 +1,6 @@
 import { useI18n } from '../i18n/I18nProvider.jsx';
+import { formatNetworkSpeed } from '../lib/format-metrics.js';
 import { formatMetricValue, resolveMetricState } from '../lib/metrics-view.js';
-
-function fmtBps(v) {
-  if (v == null) return null;
-  if (v < 1024) return `${v} B/s`;
-  if (v < 1024 ** 2) return `${(v / 1024).toFixed(1)} KB/s`;
-  return `${(v / 1024 ** 2).toFixed(1)} MB/s`;
-}
 
 export function Network({ metrics, online }) {
   const { t } = useI18n();
@@ -25,10 +19,10 @@ export function Network({ metrics, online }) {
     row(t('network.interface'), n.interface),
     row(t('network.type'), n.type),
     row(t('network.ipv4'), n.ipv4),
-    row(t('network.download'), n.downloadBps, fmtBps(n.downloadBps), bpsPending),
-    row(t('network.upload'), n.uploadBps, fmtBps(n.uploadBps), bpsPending),
-    row(t('network.ping'), n.pingMs, n.pingMs != null ? `${n.pingMs} ms` : null, false),
-    row(t('network.linkSpeed'), n.linkSpeedMbps, n.linkSpeedMbps != null ? `${n.linkSpeedMbps} Mbps` : null, false),
+    row(t('network.download'), n.downloadBps, formatNetworkSpeed(n.downloadBps), bpsPending),
+    row(t('network.upload'), n.uploadBps, formatNetworkSpeed(n.uploadBps), bpsPending),
+    row(t('network.ping'), n.pingMs, n.pingMs != null ? `${Math.round(n.pingMs)} ms` : null, false),
+    row(t('network.linkSpeed'), n.linkSpeedMbps, n.linkSpeedMbps != null ? `${Math.round(n.linkSpeedMbps)} Mbps` : null, false),
   ];
 
   return (
