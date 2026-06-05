@@ -112,6 +112,268 @@ button {
   color: var(--danger);
 }
 
+.status-pill--danger {
+  border-color: rgba(248, 81, 73, 0.55);
+  color: var(--danger);
+  box-shadow: 0 0 20px rgba(248, 81, 73, 0.15);
+}
+
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lang-toggle:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.lang-toggle__icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.lang-toggle__label {
+  font-variant-numeric: tabular-nums;
+}
+
+.conn-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.nav-tab {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-tab.is-active,
+.nav-tab:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.nav-tab--monitor {
+  margin-left: auto;
+  border-color: rgba(0, 229, 255, 0.35);
+}
+
+.nav-tab--monitor.is-active {
+  background: rgba(0, 229, 255, 0.1);
+}
+
+.nav-tab__icon {
+  margin-right: 4px;
+  opacity: 0.85;
+}
+
+.setup-steps {
+  margin: 12px 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.setup-steps li {
+  margin-bottom: 8px;
+}
+
+.env-hint {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.telegram-test {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.telegram-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.telegram-field__label {
+  min-width: 140px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.telegram-field__input {
+  flex: 1;
+  min-width: 220px;
+  max-width: 100%;
+}
+
+.telegram-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.test-ok {
+  color: var(--ok);
+  font-size: 0.88rem;
+}
+
+.test-err {
+  color: var(--danger);
+  font-size: 0.88rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.info-row dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.info-row dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.status-chip {
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.search-input,
+.select-input,
+.import-area {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 44px;
+}
+
+.import-area {
+  max-width: 100%;
+  min-height: 100px;
+  margin: 12px 0;
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.proc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.proc-table th,
+.proc-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.layout-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+
+.layout-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.layout-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-grid {
+  flex-wrap: wrap;
+}
+
 .status-dot {
   width: 8px;
   height: 8px;

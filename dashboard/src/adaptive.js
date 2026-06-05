@@ -51,5 +51,5 @@ export function getChartConfig(tier) {
   if (tier === 'lite') {
     return { maxPoints: 48, updateMs: 2000, animate: false };
   }
-  return { maxPoints: 120, updateMs: 1000, animate: false };
+  return { maxPoints: 120, updateMs: 1000, animate: true };
 }

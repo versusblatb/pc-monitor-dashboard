@@ -1,71 +1,202 @@
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
+import { AlertManager } from './alerts/alert-manager.js';
+import { TelegramConfigStore } from './alerts/telegram-config-store.js';
+import { HistoryManager } from './history/history-manager.js';
+import {
+  normalizeAgentMessage,
+  toClientPayload,
+  validateIncomingSize,
+} from './lib/normalize-metrics.js';
+import { setCors, corsOrigin } from './middleware/cors.js';
+import { rateLimit } from './middleware/rate-limit.js';
+import { handleAlertsRoute } from './routes/alerts.js';
+import { handleApiRoute } from './routes/api.js';
+import { StatusResolver } from './status/status-resolver.js';
 
 const PORT = Number(process.env.PORT) || 3847;
 const HOST = process.env.HOST || '0.0.0.0';
+const OFFLINE_TIMEOUT_MS = Number(process.env.OFFLINE_TIMEOUT_MS) || 12_000;
 
 /** @type {import('ws').WebSocket | null} */
 let agentSocket = null;
 /** @type {Set<import('ws').WebSocket>} */
 const dashboards = new Set();
 
-/** @type {{ cpu: number, ram: number, disk: number, ts: number, hostname: string } | null} */
+/** @type {Record<string, unknown> | null} */
 let latest = null;
 let agentLastSeen = 0;
+let deviceStatus = 'offline';
 
-function json(res, status, body) {
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-  });
+const statusResolver = new StatusResolver();
+const history = new HistoryManager();
+const telegramConfig = new TelegramConfigStore();
+const alerts = new AlertManager(telegramConfig);
+
+async function initPostgres() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  try {
+    const { default: pg } = await import('pg');
+    const pool = new pg.Pool({
+      connectionString: url,
+      ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+    });
+    await history.initPostgres(pool);
+    await telegramConfig.initPostgres(pool);
+    console.log('[server] PostgreSQL history + telegram config enabled');
+    return pool;
+  } catch (e) {
+    console.error('[server] PostgreSQL unavailable, using memory store:', e.message);
+    return null;
+  }
+}
+
+async function initTelegramConfig() {
+  const pool = await initPostgres();
+  if (!pool) {
+    await telegramConfig.initFile();
+  }
+  telegramConfig.seedFromEnv();
+  if (telegramConfig.get().source === 'env') {
+    console.log('[server] Telegram alerts loaded from env');
+  } else if (alerts.configured) {
+    console.log('[server] Telegram alerts loaded from saved config');
+  }
+}
+
+function json(res, req, status, body) {
+  setCors(req, res);
+  res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
 }
 
 function isAgentOnline() {
-  return agentSocket?.readyState === 1 && Date.now() - agentLastSeen < 10_000;
+  return agentSocket?.readyState === 1 && Date.now() - agentLastSeen < OFFLINE_TIMEOUT_MS;
 }
 
-const server = http.createServer((req, res) => {
+function updateStatus() {
+  const { status, changed } = statusResolver.resolve({
+    online: isAgentOnline(),
+    metrics: latest,
+  });
+  deviceStatus = status;
+  alerts.onStatusChange({ status, changed, online: isAgentOnline(), metrics: latest });
+  return { status, changed };
+}
+
+function broadcastMetrics() {
+  const payload = { ...latest, status: deviceStatus, lastSeen: agentLastSeen };
+  const out = JSON.stringify({ type: 'metrics', payload });
+  for (const d of dashboards) {
+    if (d.readyState === 1) d.send(out);
+  }
+}
+
+function broadcastStatus() {
+  const msg = JSON.stringify({
+    type: 'status',
+    payload: {
+      online: isAgentOnline(),
+      metrics: latest,
+      status: deviceStatus,
+      lastSeen: agentLastSeen,
+    },
+  });
+  for (const d of dashboards) {
+    if (d.readyState === 1) d.send(msg);
+  }
+}
+
+function handleAgentMetrics(raw) {
+  try {
+    validateIncomingSize(raw);
+    const msg = JSON.parse(String(raw));
+    const normalized = normalizeAgentMessage(msg);
+    if (!normalized) return;
+
+    latest = toClientPayload(normalized);
+    agentLastSeen = Date.now();
+
+    const { status } = updateStatus();
+    history.onMetrics(latest, status);
+    broadcastMetrics();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[server] metrics parse error:', message);
+  }
+}
+
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    });
+    setCors(req, res);
+    res.writeHead(204);
     res.end();
     return;
   }
 
-  if (url.pathname === '/api/health') {
-    json(res, 200, {
+  const isAlertsPost =
+    req.method === 'POST' &&
+    (url.pathname === '/api/alerts/config' ||
+      url.pathname === '/api/alerts/bot-info' ||
+      url.pathname === '/api/alerts/discover-chat' ||
+      url.pathname === '/api/alerts/test');
+
+  if (req.method !== 'GET' && !isAlertsPost) {
+    json(res, req, 405, { error: 'method not allowed' });
+    return;
+  }
+
+  if (!rateLimit(req)) {
+    json(res, req, 429, { error: 'rate limit exceeded' });
+    return;
+  }
+
+  if (url.pathname === '/api/health' || url.pathname === '/health') {
+    json(res, req, 200, {
       ok: true,
       agentOnline: isAgentOnline(),
       dashboards: dashboards.size,
       uptime: process.uptime(),
+      schemaVersion: latest?.schemaVersion ?? null,
+      status: deviceStatus,
+      historyPoints: history.memory.size,
+      telegram: alerts.configured,
     });
     return;
   }
 
-  if (url.pathname === '/api/metrics') {
-    json(res, 200, {
-      online: isAgentOnline(),
-      metrics: latest,
-      stale: !isAgentOnline(),
-    });
+  if (url.pathname.startsWith('/api/alerts/')) {
+    const handled = await handleAlertsRoute(req, res, url, alerts, telegramConfig, json);
+    if (handled) return;
+  }
+
+  const api = await handleApiRoute(url, {
+    isAgentOnline,
+    latest,
+    agentLastSeen,
+    status: deviceStatus,
+    history,
+  });
+
+  if (api) {
+    json(res, req, api.status, api.body);
     return;
   }
 
   if (url.pathname === '/api/stream') {
+    setCors(req, res);
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
     });
     const send = () => {
-      res.write(`data: ${JSON.stringify({ online: isAgentOnline(), metrics: latest })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ online: isAgentOnline(), metrics: latest, status: deviceStatus })}\n\n`,
+      );
     };
     send();
     const id = setInterval(send, 1000);
@@ -73,7 +204,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  json(res, 404, { error: 'not found' });
+  json(res, req, 404, { error: 'not found' });
 });
 
 const wss = new WebSocketServer({ server });
@@ -83,7 +214,6 @@ wss.on('connection', (ws, req) => {
   const role = url.searchParams.get('role');
 
   if (role === 'agent') {
-    // Keep existing agent if still alive — avoids fight when two agents reconnect
     if (agentSocket && agentSocket !== ws && agentSocket.readyState === 1) {
       console.log('[server] agent already connected, rejecting duplicate');
       ws.close(4000, 'agent already connected');
@@ -91,27 +221,13 @@ wss.on('connection', (ws, req) => {
     }
     agentSocket = ws;
     agentLastSeen = Date.now();
+    updateStatus();
     console.log('[server] agent connected');
-
-    ws.on('message', (raw) => {
-      try {
-        const msg = JSON.parse(String(raw));
-        if (msg.type === 'metrics' && msg.payload) {
-          latest = msg.payload;
-          agentLastSeen = Date.now();
-          const out = JSON.stringify({ type: 'metrics', payload: latest });
-          for (const d of dashboards) {
-            if (d.readyState === 1) d.send(out);
-          }
-        }
-      } catch {
-        /* ignore bad payload */
-      }
-    });
-
+    ws.on('message', handleAgentMetrics);
     ws.on('close', () => {
       if (agentSocket === ws) agentSocket = null;
       console.log('[server] agent disconnected');
+      updateStatus();
       broadcastStatus();
     });
     return;
@@ -123,7 +239,12 @@ wss.on('connection', (ws, req) => {
   ws.send(
     JSON.stringify({
       type: 'status',
-      payload: { online: isAgentOnline(), metrics: latest },
+      payload: {
+        online: isAgentOnline(),
+        metrics: latest,
+        status: deviceStatus,
+        lastSeen: agentLastSeen,
+      },
     }),
   );
 
@@ -133,30 +254,24 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-function broadcastStatus() {
-  const msg = JSON.stringify({
-    type: 'status',
-    payload: { online: isAgentOnline(), metrics: latest },
-  });
-  for (const d of dashboards) {
-    if (d.readyState === 1) d.send(msg);
-  }
-}
-
-setInterval(broadcastStatus, 3000);
+setInterval(() => {
+  const prev = deviceStatus;
+  updateStatus();
+  history.flushPending();
+  if (deviceStatus !== prev || !isAgentOnline()) broadcastStatus();
+}, 3000);
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(
-      `[server] port ${PORT} already in use — stop the old server first:\n` +
-        `  Get-NetTCPConnection -LocalPort ${PORT} | Select OwningProcess\n` +
-        `  Stop-Process -Id <PID> -Force`,
-    );
+    console.error(`[server] port ${PORT} already in use`);
     process.exit(1);
   }
   throw err;
 });
 
+await initTelegramConfig();
+
 server.listen(PORT, HOST, () => {
   console.log(`[server] http://localhost:${PORT}  ws://localhost:${PORT}`);
+  console.log(`[server] CORS origin: ${corsOrigin({ headers: {} })}`);
 });

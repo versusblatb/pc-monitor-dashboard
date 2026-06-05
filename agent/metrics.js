@@ -106,7 +106,7 @@ Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | 
   }
 }
 
-function getDisksWindows() {
+export function getDisksWindows() {
   try {
     const raw = ps(
       'Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | Select-Object @{N="letter";E={$_.DeviceID}}, @{N="usedPct";E={[int][math]::Round(100*($_.Size-$_.FreeSpace)/$_.Size)}}, @{N="usedGb";E={[math]::Round(($_.Size-$_.FreeSpace)/1GB,1)}}, @{N="totalGb";E={[math]::Round($_.Size/1GB,1)}} | ConvertTo-Json -Compress',

@@ -1,0 +1,61 @@
+.theme-cyberpunk {
+  --bg: #0a0e14;
+  --surface: #121820;
+  --cyan: #00e5ff;
+  --purple: #7a5cff;
+  --accent: #00e5ff;
+}
+
+.theme-minimal {
+  --bg: #111111;
+  --surface: #1a1a1a;
+  --cyan: #e0e0e0;
+  --purple: #b0b0b0;
+  --accent: #ffffff;
+}
+
+.theme-oled {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --cyan: #4fc3f7;
+  --purple: #9575cd;
+  --accent: #4fc3f7;
+}
+
+.theme-terminal {
+  --bg: #0d1110;
+  --surface: #141a18;
+  --cyan: #33ff66;
+  --purple: #22cc55;
+  --accent: #33ff66;
+}
+
+.theme-ice {
+  --bg: #0b1220;
+  --surface: #152238;
+  --cyan: #7dd3fc;
+  --purple: #93c5fd;
+  --accent: #38bdf8;
+}
+
+.theme-rgb {
+  --bg: #0f0a14;
+  --surface: #1a1020;
+  --cyan: #ff00aa;
+  --purple: #00e5ff;
+  --accent: #ff00aa;
+}
+
+.perf-lite .theme-rgb .app-glow {
+  display: none;
+}
+
+.perf-lite .app-glow {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-rgb * {
+    animation: none !important;
+  }
+}

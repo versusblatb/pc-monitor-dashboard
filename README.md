@@ -1,80 +1,73 @@
-# PC Monitor MVP
+# PC Monitor Dashboard 2.0
 
-Рабочий end-to-end продукт: **desktop agent → backend → realtime dashboard**.
+Agent → Backend (Render) → Dashboard (Vercel). Monorepo npm workspaces.
 
-Без лишних abstraction layers — три простых пакета в monorepo.
+## Production
 
-## Что внутри
+| Service | URL |
+|---------|-----|
+| Backend | https://pc-monitor-dashboard.onrender.com |
+| WebSocket | wss://pc-monitor-dashboard.onrender.com |
+| Dashboard | https://pc-monitor-dashboard-dashboard.vercel.app |
 
-| Пакет | Порт | Назначение |
-|-------|------|------------|
-| `server` | 3847 | HTTP API + WebSocket hub |
-| `agent` | — | Сбор CPU/RAM с ПК, отправка на server |
-| `dashboard` | 5173 | React UI, графики, online/offline, adaptive perf |
-
-## Быстрый старт
+## Local start
 
 ```bash
-cd c:\Users\IT-DEVELOPER\Documents\My
 npm install
 npm run dev
 ```
 
-Откройте **http://localhost:5173**
+- Dashboard: http://localhost:5173
+- Server: http://localhost:3847
+- Command Center: http://localhost:5173/command-center
 
-## Отдельный запуск
+## Agent only (Windows PC)
 
 ```bash
-npm run dev -w server    # backend
-npm run dev -w agent     # desktop agent (на машине с метриками)
-npm run dev -w dashboard # UI
+set SERVER_URL=wss://pc-monitor-dashboard.onrender.com?role=agent
+npm run start -w agent
 ```
+
+Or double-click `start-agent.cmd`.
+
+## Env
+
+See `server/.env.example` and `dashboard/.env.example`.
+
+**Vercel:** `VITE_WS_URL`, `VITE_API_URL`  
+**Render:** `PORT`, `DASHBOARD_ORIGIN`, optional `DATABASE_URL`, Telegram vars
 
 ## API
 
-- `GET /api/health` — статус сервера и агента
-- `GET /api/metrics` — последние метрики + `online`
-- `GET /api/stream` — SSE fallback
-- `WS /?role=agent` — агент пушит метрики
-- `WS /?role=dashboard` — дашборд получает realtime
+- `GET /api/metrics` / `/api/status` — realtime + status
+- `GET /api/history?range=1h|24h|7d`
+- `GET /api/system`, `/api/processes`, `/api/disks`, `/api/network`
+- `GET /health`, `GET /api/stream` (SSE)
+- `WS ?role=agent|dashboard`
 
-## Метрики
-
-```json
-{
-  "cpu": 42,
-  "ram": 61,
-  "disk": 0,
-  "ts": 1710000000000,
-  "hostname": "DESKTOP-PC"
-}
-```
-
-## Dashboard
-
-- **Online/offline** — статус агента + fallback polling
-- **Charts** — Recharts CPU/RAM
-- **Adaptive** — Auto / Lite / Full (localStorage, iPad/mobile auto-lite)
-- **Mobile + iPad** — responsive layout, 44px touch targets, safe areas
-
-## Production build
+## PostgreSQL (optional)
 
 ```bash
-npm run build -w dashboard
-npm run start -w server
-npm run start -w agent
-# serve dashboard/dist via nginx or: npm run preview -w dashboard
+DATABASE_URL=postgres://... npm run migrate -w server
 ```
 
-## Переменные окружения
+## Telegram
 
-| Var | Default | |
-|-----|---------|--|
-| `PORT` | 3847 | server port |
-| `SERVER_URL` | ws://127.0.0.1:3847?role=agent | agent WS |
-| `INTERVAL_MS` | 1000 | agent tick |
-| `VITE_WS_URL` | — | dashboard WS override |
+1. Create bot via @BotFather → `TELEGRAM_BOT_TOKEN`
+2. Get chat id → `TELEGRAM_CHAT_ID`
+3. Render env: `TELEGRAM_ALERTS_ENABLED=true`
 
-## Папка performance-system
+## Tests
 
-Отдельная библиотека (опционально). MVP dashboard использует **простой** `src/adaptive.js` — без platform layers.
+```bash
+npm test -w server
+npm test -w dashboard
+npm run build -w dashboard
+```
+
+## Deploy
+
+**Render:** Root `server`, Build `npm install`, Start `npm start`  
+**Vercel:** Root `dashboard`, Build `npm run build`
+
+See `IMPLEMENTATION_PLAN.md` and `CHANGELOG.md` for details.

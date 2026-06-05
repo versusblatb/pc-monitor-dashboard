@@ -1,0 +1,558 @@
+/* Premium motion — only when perf tier is "full" (.perf-full on <html>) */
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+
+@keyframes premium-aurora {
+  0%, 100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 0.55;
+  }
+  33% {
+    transform: translate(4%, -3%) scale(1.08) rotate(2deg);
+    opacity: 0.75;
+  }
+  66% {
+    transform: translate(-3%, 2%) scale(0.96) rotate(-1deg);
+    opacity: 0.6;
+  }
+}
+
+@keyframes premium-orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(18px, -24px) scale(1.12); }
+}
+
+@keyframes premium-glow-breathe {
+  0%, 100% { opacity: 0.65; filter: blur(0); }
+  50% { opacity: 1; filter: blur(1px); }
+}
+
+@keyframes premium-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.985);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes premium-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes premium-header-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+    letter-spacing: 0.08em;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    letter-spacing: -0.02em;
+  }
+}
+
+@keyframes premium-gradient-shift {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 200% center; }
+}
+
+@keyframes premium-shimmer {
+  0% { transform: translateX(-120%) skewX(-12deg); }
+  100% { transform: translateX(220%) skewX(-12deg); }
+}
+
+@keyframes premium-bar-shine {
+  0%, 100% { opacity: 0; transform: translateX(-100%); }
+  40% { opacity: 1; }
+  60% { opacity: 1; transform: translateX(200%); }
+}
+
+@keyframes premium-status-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(63, 185, 80, 0.12), inset 0 0 12px rgba(63, 185, 80, 0.04); }
+  50% { box-shadow: 0 0 32px rgba(63, 185, 80, 0.28), inset 0 0 20px rgba(63, 185, 80, 0.08); }
+}
+
+@keyframes premium-dot-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 8px currentColor; }
+  50% { transform: scale(1.35); box-shadow: 0 0 18px currentColor, 0 0 32px currentColor; }
+}
+
+@keyframes premium-nav-line {
+  0%, 100% { opacity: 0.5; width: 40%; }
+  50% { opacity: 1; width: 75%; }
+}
+
+@keyframes premium-scan-drift {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes premium-border-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes premium-cc-value-pop {
+  0%, 100% { text-shadow: 0 0 0 transparent; }
+  50% { text-shadow: 0 0 24px color-mix(in srgb, var(--cyan) 40%, transparent); }
+}
+
+/* ── Ambient background layers ───────────────────────────── */
+
+.app-ambient,
+.app-scanlines {
+  display: none;
+}
+
+.perf-full .app-ambient {
+  display: block;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.perf-full .app-ambient__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  will-change: transform;
+}
+
+.perf-full .app-ambient__orb--1 {
+  width: min(55vw, 420px);
+  height: min(55vw, 420px);
+  top: -12%;
+  left: -8%;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.22), transparent 70%);
+  animation: premium-orb-float 14s ease-in-out infinite;
+}
+
+.perf-full .app-ambient__orb--2 {
+  width: min(45vw, 360px);
+  height: min(45vw, 360px);
+  top: 35%;
+  right: -10%;
+  background: radial-gradient(circle, rgba(122, 92, 255, 0.2), transparent 70%);
+  animation: premium-orb-float 18s ease-in-out infinite reverse;
+  animation-delay: -4s;
+}
+
+.perf-full .app-ambient__orb--3 {
+  width: min(35vw, 280px);
+  height: min(35vw, 280px);
+  bottom: 5%;
+  left: 25%;
+  background: radial-gradient(circle, rgba(255, 176, 32, 0.12), transparent 70%);
+  animation: premium-orb-float 22s ease-in-out infinite;
+  animation-delay: -8s;
+}
+
+.perf-full .app-scanlines {
+  display: block;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 229, 255, 0.15) 2px,
+    rgba(0, 229, 255, 0.15) 3px
+  );
+}
+
+.perf-full .app-glow {
+  animation: premium-aurora 20s ease-in-out infinite, premium-glow-breathe 8s ease-in-out infinite;
+}
+
+/* ── Shell entrance ──────────────────────────────────────── */
+
+.perf-full .header {
+  animation: premium-header-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.perf-full .nav-tabs {
+  animation: premium-header-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.perf-full .header h1 {
+  background: linear-gradient(
+    120deg,
+    var(--text) 0%,
+    var(--cyan) 35%,
+    var(--purple) 65%,
+    var(--text) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: premium-gradient-shift 10s ease infinite;
+}
+
+.perf-full .eyebrow {
+  animation: premium-gradient-shift 6s ease infinite;
+  text-shadow: 0 0 20px color-mix(in srgb, var(--cyan) 35%, transparent);
+}
+
+/* ── Page transitions ────────────────────────────────────── */
+
+.perf-full .page-transition {
+  animation: premium-page-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Cards & panels ──────────────────────────────────────── */
+
+.perf-full .metric-card,
+.perf-full .disk-card,
+.perf-full .panel,
+.perf-full .chart-panel {
+  position: relative;
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.35s ease;
+}
+
+.perf-full .page-transition .metric-card,
+.perf-full .page-transition .disk-card,
+.perf-full .page-transition .panel,
+.perf-full .page-transition .chart-panel {
+  animation: premium-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.perf-full .page-transition .metrics-grid .metric-card:nth-child(1) { animation-delay: 0.06s; }
+.perf-full .page-transition .metrics-grid .metric-card:nth-child(2) { animation-delay: 0.12s; }
+.perf-full .page-transition .metrics-grid .metric-card:nth-child(3) { animation-delay: 0.18s; }
+.perf-full .page-transition .metrics-grid .metric-card:nth-child(4) { animation-delay: 0.24s; }
+
+.perf-full .page-transition .disks-grid .disk-card:nth-child(1) { animation-delay: 0.2s; }
+.perf-full .page-transition .disks-grid .disk-card:nth-child(2) { animation-delay: 0.28s; }
+.perf-full .page-transition .disks-grid .disk-card:nth-child(3) { animation-delay: 0.36s; }
+
+.perf-full .page-transition .settings-page .panel:nth-of-type(1) { animation-delay: 0.05s; }
+.perf-full .page-transition .settings-page .panel:nth-of-type(2) { animation-delay: 0.12s; }
+.perf-full .page-transition .settings-page .panel:nth-of-type(3) { animation-delay: 0.19s; }
+.perf-full .page-transition .settings-page .panel:nth-of-type(4) { animation-delay: 0.26s; }
+
+.perf-full .page-transition .chart-panel { animation-delay: 0.32s; }
+
+.perf-full .metric-card::before,
+.perf-full .disk-card::before,
+.perf-full .panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--cyan) 60deg,
+    var(--purple) 120deg,
+    transparent 180deg,
+    var(--cyan) 240deg,
+    transparent 300deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+  animation: premium-border-spin 6s linear infinite;
+}
+
+.perf-full .metric-card:hover,
+.perf-full .disk-card:hover,
+.perf-full .panel:hover {
+  transform: translateY(-5px) scale(1.015);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.35),
+    0 0 40px color-mix(in srgb, var(--cyan) 12%, transparent);
+  border-color: color-mix(in srgb, var(--cyan) 45%, var(--border));
+}
+
+.perf-full .metric-card:hover::before,
+.perf-full .disk-card:hover::before,
+.perf-full .panel:hover::before {
+  opacity: 0.85;
+}
+
+.perf-full .metric-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 60%
+  );
+  transform: translateX(-120%) skewX(-8deg);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.perf-full .metric-card:hover::after {
+  opacity: 1;
+  animation: premium-shimmer 0.9s ease forwards;
+}
+
+/* ── Metric bars ─────────────────────────────────────────── */
+
+.perf-full .metric-bar__fill {
+  position: relative;
+  transition: width 0.65s cubic-bezier(0.34, 1.4, 0.64, 1);
+  box-shadow: 0 0 12px color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.perf-full .metric-bar__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: premium-bar-shine 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.perf-full .metric-card__num {
+  transition: transform 0.4s cubic-bezier(0.34, 1.4, 0.64, 1), text-shadow 0.4s ease;
+}
+
+.perf-full .metric-card:hover .metric-card__num {
+  transform: scale(1.04);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--cyan) 25%, transparent);
+}
+
+.perf-full .metric-card__dot {
+  animation: premium-dot-pulse 3s ease-in-out infinite;
+}
+
+/* ── Navigation & controls ───────────────────────────────── */
+
+.perf-full .nav-tab {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.35s ease,
+    background 0.35s ease;
+}
+
+.perf-full .nav-tab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.perf-full .nav-tab.is-active {
+  box-shadow:
+    0 0 24px color-mix(in srgb, var(--cyan) 18%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--cyan) 6%, transparent);
+}
+
+.perf-full .nav-tab.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  animation: premium-nav-line 2.5s ease-in-out infinite;
+}
+
+.perf-full .nav-tab--monitor.is-active {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(122, 92, 255, 0.08));
+}
+
+.perf-full .lang-toggle,
+.perf-full .perf-btn {
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease,
+    box-shadow 0.3s ease,
+    color 0.25s ease;
+}
+
+.perf-full .lang-toggle:hover,
+.perf-full .perf-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.perf-full .perf-btn.is-active {
+  box-shadow: 0 0 20px color-mix(in srgb, var(--cyan) 20%, transparent);
+}
+
+/* ── Status & chips ──────────────────────────────────────── */
+
+.perf-full .status-pill--online {
+  animation: premium-status-glow 3.5s ease-in-out infinite;
+}
+
+.perf-full .status-pill--danger {
+  animation: premium-status-glow 1.8s ease-in-out infinite;
+}
+
+.perf-full .status-chip {
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.perf-full .status-chip:hover {
+  transform: scale(1.04);
+  border-color: color-mix(in srgb, var(--cyan) 40%, var(--border));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.perf-full .banner {
+  animation: premium-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Tables & lists ──────────────────────────────────────── */
+
+.perf-full .page-transition .proc-table tbody tr {
+  animation: premium-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.perf-full .page-transition .proc-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
+.perf-full .page-transition .proc-table tbody tr:nth-child(2) { animation-delay: 0.08s; }
+.perf-full .page-transition .proc-table tbody tr:nth-child(3) { animation-delay: 0.12s; }
+.perf-full .page-transition .proc-table tbody tr:nth-child(4) { animation-delay: 0.16s; }
+.perf-full .page-transition .proc-table tbody tr:nth-child(5) { animation-delay: 0.2s; }
+.perf-full .page-transition .proc-table tbody tr:nth-child(n+6) { animation-delay: 0.24s; }
+
+.perf-full .layout-item {
+  transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.perf-full .layout-item:hover {
+  transform: translateX(4px);
+}
+
+/* ── Chart ───────────────────────────────────────────────── */
+
+.perf-full .chart-panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.perf-full .chart-legend__swatch {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.perf-full .chart-legend li:hover .chart-legend__swatch {
+  transform: scaleX(1.4);
+  box-shadow: 0 0 10px currentColor;
+}
+
+/* ── Monitor mode ────────────────────────────────────────── */
+
+.perf-full .command-center {
+  overflow: hidden;
+}
+
+.perf-full .command-center::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 20%, rgba(0, 229, 255, 0.1), transparent),
+    radial-gradient(ellipse 60% 45% at 80% 70%, rgba(122, 92, 255, 0.08), transparent);
+  animation: premium-aurora 24s ease-in-out infinite;
+}
+
+.perf-full .command-center::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.06), transparent);
+  animation: premium-scan-drift 12s linear infinite;
+  opacity: 0.4;
+}
+
+.perf-full .command-center > * {
+  position: relative;
+  z-index: 1;
+}
+
+.perf-full .cc-metric {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.45s ease;
+  animation: premium-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.perf-full .cc-grid .cc-metric:nth-child(1) { animation-delay: 0.05s; }
+.perf-full .cc-grid .cc-metric:nth-child(2) { animation-delay: 0.1s; }
+.perf-full .cc-grid .cc-metric:nth-child(3) { animation-delay: 0.15s; }
+.perf-full .cc-grid .cc-metric:nth-child(4) { animation-delay: 0.2s; }
+.perf-full .cc-grid .cc-metric:nth-child(5) { animation-delay: 0.25s; }
+.perf-full .cc-grid .cc-metric:nth-child(6) { animation-delay: 0.3s; }
+.perf-full .cc-grid .cc-metric:nth-child(7) { animation-delay: 0.35s; }
+.perf-full .cc-grid .cc-metric:nth-child(8) { animation-delay: 0.4s; }
+
+.perf-full .cc-metric:hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 30px color-mix(in srgb, var(--cyan) 10%, transparent);
+}
+
+.perf-full .cc-value {
+  animation: premium-cc-value-pop 4s ease-in-out infinite;
+}
+
+.perf-full .cc-clock__time {
+  background: linear-gradient(135deg, var(--text), var(--cyan), var(--purple));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: premium-gradient-shift 8s ease infinite;
+}
+
+.perf-full .cc-exit {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease, border-color 0.3s ease;
+}
+
+.perf-full .cc-exit:hover {
+  transform: translateX(-4px) scale(1.04);
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--cyan) 25%, transparent);
+}
+
+/* ── Reduced motion fallback ─────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .perf-full *,
+  .perf-full *::before,
+  .perf-full *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}

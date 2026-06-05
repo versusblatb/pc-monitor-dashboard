@@ -1,0 +1,127 @@
+.command-center {
+  position: relative;
+  min-height: 100vh;
+  padding: 24px;
+  padding-top: 56px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cc-exit {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.cc-exit:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.cc-exit__arrow {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.cc-mode-label {
+  margin: 4px 0 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.command-center.shift-1 { padding-top: 28px; }
+.command-center.shift-2 { padding-left: 28px; }
+.command-center.shift-3 { padding-top: 20px; padding-left: 20px; }
+
+.cc-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cc-clock__time {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-clock__date {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.cc-host h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.cc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  flex: 1;
+}
+
+.cc-metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.cc-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.cc-value {
+  display: block;
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 8px 0 12px;
+}
+
+.cc-value.cc-small {
+  font-size: 1.5rem;
+}
+
+.cc-footer {
+  display: flex;
+  gap: 24px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.perf-lite .command-center .metric-bar__fill {
+  transition: none;
+}
+
+@media (orientation: portrait) {
+  .cc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

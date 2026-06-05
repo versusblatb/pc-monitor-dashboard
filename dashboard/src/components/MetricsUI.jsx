@@ -1,3 +1,5 @@
+import { useI18n } from '../i18n/I18nProvider.jsx';
+
 function MetricBar({ value, color, label }) {
   const v = Math.min(100, Math.max(0, value ?? 0));
   return (
@@ -25,36 +27,54 @@ function MetricCard({ label, value, unit = '%', sub, color, accent, children }) 
 }
 
 function DiskCard({ disk }) {
-  const typeLabel = disk.type === 'ssd' ? 'SSD' : disk.type === 'hdd' ? 'HDD' : 'Disk';
+  const { t } = useI18n();
+  const typeLabel = disk.type === 'ssd' ? 'SSD' : disk.type === 'hdd' ? 'HDD' : t('disks.disk');
+  const label = disk.letter ?? disk.mount ?? t('disks.disk');
+  const usedPct = disk.usedPct ?? disk.usedPercent;
+
   return (
     <article className="disk-card">
       <div className="disk-card__head">
-        <span className={`disk-badge disk-badge--${disk.type}`}>{typeLabel}</span>
-        <span className="disk-card__letter">{disk.letter}</span>
+        <span className={`disk-badge disk-badge--${disk.type || 'disk'}`}>{typeLabel}</span>
+        <span className="disk-card__letter">{label}</span>
       </div>
       <div className="disk-card__stats">
         <div>
-          <span className="disk-card__pct">{disk.usedPct}%</span>
-          <span className="disk-card__hint">занято</span>
+          <span className="disk-card__pct">{usedPct ?? '—'}%</span>
+          <span className="disk-card__hint">{t('disks.used')}</span>
         </div>
         <div>
-          <span className="disk-card__pct">{disk.loadPct}%</span>
-          <span className="disk-card__hint">нагрузка</span>
+          <span className="disk-card__pct">{disk.loadPct ?? 0}%</span>
+          <span className="disk-card__hint">{t('disks.load')}</span>
         </div>
       </div>
       <p className="disk-card__sub">
         {disk.usedGb} / {disk.totalGb} GB
       </p>
-      <MetricBar value={disk.loadPct} color="#3fb950" label={`Нагрузка ${disk.letter}`} />
-      <MetricBar value={disk.usedPct} color="#58a6ff" label={`Заполнение ${disk.letter}`} />
+      <MetricBar value={disk.loadPct} color="#3fb950" label={`${t('disks.load')} ${label}`} />
+      <MetricBar value={disk.usedPct} color="#58a6ff" label={`${t('disks.used')} ${label}`} />
     </article>
   );
 }
 
-const LEGEND = [
-  { key: 'cpu', label: 'CPU — процессор', color: '#00e5ff' },
-  { key: 'ram', label: 'RAM — память', color: '#7a5cff' },
-  { key: 'gpu', label: 'GPU — видеокарта', color: '#ffb020' },
-];
+function ChartLegend() {
+  const { t } = useI18n();
+  const items = [
+    { key: 'cpu', label: t('chart.legendCpu'), color: '#00e5ff' },
+    { key: 'ram', label: t('chart.legendRam'), color: '#7a5cff' },
+    { key: 'gpu', label: t('chart.legendGpu'), color: '#ffb020' },
+  ];
 
-export { MetricBar, MetricCard, DiskCard, LEGEND };
+  return (
+    <ul className="chart-legend" aria-label={t('chart.title')}>
+      {items.map((item) => (
+        <li key={item.key}>
+          <span className="chart-legend__swatch" style={{ background: item.color }} />
+          {item.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export { MetricBar, MetricCard, DiskCard, ChartLegend };
