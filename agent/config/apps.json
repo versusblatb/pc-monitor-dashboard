@@ -2,7 +2,7 @@
   "apps": [
     {
       "id": "notepad",
-      "label": "Notepad",
+      "label": "Блокнот",
       "executable": "C:\\Windows\\System32\\notepad.exe",
       "args": [],
       "allowStop": true
