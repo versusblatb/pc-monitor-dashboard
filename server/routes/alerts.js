@@ -35,6 +35,7 @@ export async function handleAlertsRoute(req, res, url, alerts, store, json) {
           enabled: body.enabled,
           botToken: body.botToken,
           chatId: body.chatId,
+          botUsername: body.botUsername,
         },
         key,
       );

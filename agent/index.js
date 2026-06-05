@@ -1,11 +1,13 @@
 import { WebSocket } from 'ws';
 import os from 'node:os';
 import {
+  AGENT_VERSION,
   DUPLICATE_AGENT_DELAY_MS,
   FAST_INTERVAL_MS,
   MEDIUM_INTERVAL_MS,
   RECONNECT_BASE_MS,
   RECONNECT_MAX_MS,
+  SCHEMA_VERSION,
   SERVER_URL,
   SLOW_INTERVAL_MS,
   STATIC_REFRESH_MS,
@@ -28,6 +30,7 @@ import { collectProcesses } from './collectors/slow.js';
 const timers = [];
 let reconnectAttempt = 0;
 let shuttingDown = false;
+let connectDiagLogged = false;
 
 function clearTimers() {
   for (const t of timers) clearInterval(t);
@@ -45,26 +48,67 @@ async function refreshStatic() {
 }
 
 async function refreshFast() {
-  const [cpu, gpu, memory, uptime] = await Promise.all([
+  const [cpu, gpu, memory, uptime] = await Promise.allSettled([
     collectCpu(),
     collectGpu(),
     collectMemory(),
     collectUptime(),
   ]);
-  patchState('cpu', cpu);
-  patchState('gpu', gpu);
-  patchState('memory', memory);
-  patchState('uptime', uptime);
+  if (cpu.status === 'fulfilled') patchState('cpu', cpu.value);
+  if (gpu.status === 'fulfilled') patchState('gpu', gpu.value);
+  if (memory.status === 'fulfilled') patchState('memory', memory.value);
+  if (uptime.status === 'fulfilled') patchState('uptime', uptime.value);
 }
 
 async function refreshMedium() {
-  const [network, disks] = await Promise.all([collectNetwork(), collectDisks()]);
-  patchState('network', network);
-  patchState('disks', disks);
+  const [network, disks] = await Promise.allSettled([collectNetwork(), collectDisks()]);
+  if (network.status === 'fulfilled') patchState('network', network.value);
+  if (disks.status === 'fulfilled') patchState('disks', disks.value);
 }
 
 async function refreshSlow() {
-  patchState('processes', await collectProcesses());
+  const processes = await collectProcesses();
+  if (processes) patchState('processes', processes);
+}
+
+async function bootstrapCollectors() {
+  await refreshStatic().catch(() => {});
+  await Promise.allSettled([
+    refreshFast(),
+    refreshMedium(),
+    refreshSlow(),
+  ]);
+}
+
+function logConnectDiagnostics(ws) {
+  if (connectDiagLogged) return;
+  connectDiagLogged = true;
+
+  try {
+    const payload = buildPayload(state);
+    const message = createMetricsMessage(payload);
+    const bytes = Buffer.byteLength(JSON.stringify(message), 'utf8');
+    const procs = state.processes;
+
+    console.log('[agent] connect diagnostics:', {
+      schemaVersion: SCHEMA_VERSION,
+      agentVersion: AGENT_VERSION,
+      hostname: payload.hostname,
+      hasSystem: Boolean(state.system && Object.values(state.system).some((v) => v != null && v !== '')),
+      hasCpu: state.cpu?.usage != null || state.cpu?.model != null,
+      hasGpu: state.gpu?.available || state.gpu?.model != null || state.gpu?.usage != null,
+      disks: Array.isArray(state.disks) ? state.disks.length : 0,
+      processTotal: procs?.total ?? null,
+      topCpu: procs?.topCpu?.length ?? 0,
+      topMemory: procs?.topMemory?.length ?? 0,
+      hasNetwork: Boolean(state.network?.interface || state.network?.ipv4),
+      payloadBytes: bytes,
+      wsReady: ws.readyState === 1,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[agent] connect diagnostics failed:', msg);
+  }
 }
 
 function sendMetrics(ws) {
@@ -86,6 +130,7 @@ function startCollectors(ws) {
   refreshStatic().catch(() => {});
   refreshFast().catch(() => {});
   refreshMedium().catch(() => {});
+  refreshSlow().catch(() => {});
 
   timers.push(
     setInterval(() => sendMetrics(ws), FAST_INTERVAL_MS),
@@ -104,9 +149,9 @@ function connect() {
   ws.on('open', async () => {
     reconnectAttempt = 0;
     console.log('[agent] connected to', SERVER_URL);
-    await refreshFast().catch(() => {});
-    await refreshMedium().catch(() => {});
+    await bootstrapCollectors();
     startCollectors(ws);
+    logConnectDiagnostics(ws);
     sendMetrics(ws);
   });
 
@@ -143,5 +188,5 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-console.log('[agent] PC Monitor Agent v2 —', os.platform(), os.hostname());
+console.log('[agent] PC Monitor Agent v2 —', AGENT_VERSION, os.platform(), os.hostname());
 connect();

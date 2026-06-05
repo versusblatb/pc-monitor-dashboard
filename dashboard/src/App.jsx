@@ -29,12 +29,12 @@ function DashboardRoutes() {
     <Routes>
       <Route element={<AppShell hostname={ctx.hostname} online={ctx.online} status={ctx.status} wsConnected={ctx.wsConnected} />}>
         <Route index element={<Overview {...ctx} />} />
-        <Route path="hardware" element={<Hardware {...common} />} />
-        <Route path="processes" element={<Processes {...common} />} />
+        <Route path="hardware" element={<Hardware {...common} online={ctx.online} />} />
+        <Route path="processes" element={<Processes {...common} online={ctx.online} />} />
         <Route path="storage" element={<Storage {...common} />} />
-        <Route path="network" element={<Network {...common} />} />
+        <Route path="network" element={<Network {...common} online={ctx.online} />} />
+        <Route path="settings" element={<Settings metrics={ctx.metrics} online={ctx.online} />} />
         <Route path="history" element={<HistoryPage />} />
-        <Route path="settings" element={<Settings />} />
       </Route>
       <Route
         path="monitor"

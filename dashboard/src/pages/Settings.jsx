@@ -5,8 +5,10 @@ import { LayoutEditor } from '../layout/LayoutEditor.jsx';
 import { TelegramSettings } from '../components/TelegramSettings.jsx';
 import { useI18n } from '../i18n/I18nProvider.jsx';
 
-export function Settings() {
+export function Settings({ metrics, online }) {
   const { t } = useI18n();
+  const schemaVersion = metrics?.schemaVersion ?? null;
+  const agentVersion = metrics?.agentVersion ?? metrics?.system?.agentVersion ?? null;
   const [mode, setMode] = useState(getPerfMode);
   const [theme, setThemeState] = useState(getTheme);
 
@@ -41,6 +43,27 @@ export function Settings() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="panel">
+        <h2 className="section-title">{t('settings.diagnosticsTitle')}</h2>
+        <dl className="info-grid">
+          <div className="info-row">
+            <dt>{t('settings.agentVersion')}</dt>
+            <dd>{agentVersion ?? (online ? t('metricsState.pending') : t('metricsState.loading'))}</dd>
+          </div>
+          <div className="info-row">
+            <dt>{t('settings.schemaVersion')}</dt>
+            <dd>{schemaVersion ?? '—'}</dd>
+          </div>
+          <div className="info-row">
+            <dt>{t('status.label')}</dt>
+            <dd>{online ? t('status.online') : t('status.offline')}</dd>
+          </div>
+        </dl>
+        {schemaVersion != null && schemaVersion < 2 && (
+          <p className="test-err">{t('metricsState.legacyAgent')}</p>
+        )}
       </section>
 
       <TelegramSettings />

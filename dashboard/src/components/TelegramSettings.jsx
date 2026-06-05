@@ -10,6 +10,7 @@ export function TelegramSettings() {
   const [chatId, setChatId] = useState('');
   const [chats, setChats] = useState([]);
   const [botInfo, setBotInfo] = useState(null);
+  const [botUsername, setBotUsername] = useState('');
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(null);
 
@@ -23,9 +24,9 @@ export function TelegramSettings() {
 
   const statusText = () => {
     if (!status) return t('settings.telegramUnknown');
-    if (status.source === 'env') return t('settings.telegramEnvLocked');
+    if (status.managedByEnv) return t('settings.telegramEnvLocked');
     if (status.configured) return t('settings.telegramOn');
-    if (status.enabled && (!status.tokenSet || !status.chatIdSet)) return t('settings.telegramIncomplete');
+    if (status.enabled && (!status.tokenSet || !status.chatConfigured)) return t('settings.telegramIncomplete');
     return t('settings.telegramOff');
   };
 
@@ -45,6 +46,7 @@ export function TelegramSettings() {
     run('verify', async () => {
       const info = await api.verifyBotToken(botToken.trim());
       setBotInfo(info);
+      if (info.username) setBotUsername(info.username);
       setMsg({ ok: true, text: t('settings.telegramBotOk', { name: info.username ? `@${info.username}` : info.firstName }) });
     });
 
@@ -59,7 +61,7 @@ export function TelegramSettings() {
   const saveConfig = () =>
     run('save', async () => {
       const res = await api.saveAlertsConfig(
-        { enabled, botToken: botToken.trim(), chatId: chatId.trim() },
+        { enabled, botToken: botToken.trim(), chatId: chatId.trim(), botUsername: botUsername.trim() || botInfo?.username },
         getTelegramConfigKey(),
       );
       if (res.configKey) setTelegramConfigKey(res.configKey);
@@ -78,7 +80,7 @@ export function TelegramSettings() {
       setMsg({ ok: true, text: t('settings.telegramTestOk') });
     });
 
-  const locked = status?.source === 'env' && !status?.uiConfigurable;
+  const locked = Boolean(status?.managedByEnv);
   const lostBrowserKey = status?.hasConfigKey && !getTelegramConfigKey();
 
   return (
@@ -100,6 +102,10 @@ export function TelegramSettings() {
       </dl>
 
       {lostBrowserKey && <p className="muted">{t('settings.telegramKeyLost')}</p>}
+
+      {status?.envIncompleteWarning && !locked && (
+        <p className="muted">{status.envIncompleteWarning}</p>
+      )}
 
       {locked ? (
         <p className="muted">{t('settings.telegramEnvNote')}</p>

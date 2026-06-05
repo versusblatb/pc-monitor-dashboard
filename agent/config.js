@@ -1,4 +1,9 @@
-export const AGENT_VERSION = '2.0.0';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const pkg = require('./package.json');
+
+export const AGENT_VERSION = pkg.version;
 export const SCHEMA_VERSION = 2;
 
 export const SERVER_URL =

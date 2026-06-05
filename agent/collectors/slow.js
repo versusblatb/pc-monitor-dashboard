@@ -2,9 +2,7 @@ import si from 'systeminformation';
 import { safeBlock } from '../lib/safe.js';
 import { sanitizeProcessList } from '../lib/validate.js';
 
-const EMPTY = { total: 0, topCpu: [], topMemory: [] };
-
-/** @returns {Promise<typeof EMPTY>} */
+/** @returns {Promise<{ total: number, topCpu: unknown[], topMemory: unknown[] }|null>} */
 export async function collectProcesses() {
   return safeBlock(
     async () => {
@@ -26,7 +24,7 @@ export async function collectProcesses() {
         topMemory: sanitized.topMemory,
       };
     },
-    { ...EMPTY },
+    null,
     'processes',
     8000,
   );

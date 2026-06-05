@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { AGENT_VERSION, SCHEMA_VERSION } from './config.js';
 import { sanitizeHostname } from './lib/validate.js';
 
 /**
@@ -10,7 +11,7 @@ import { sanitizeHostname } from './lib/validate.js';
  *   memory: Record<string, unknown>,
  *   network: Record<string, unknown>,
  *   disks: Array<Record<string, unknown>>,
- *   processes: Record<string, unknown>,
+ *   processes: Record<string, unknown>|null,
  *   uptime: number|null,
  * }} state
  */
@@ -19,6 +20,8 @@ export function buildPayload(state) {
 
   return {
     hostname,
+    agentVersion: state.system?.agentVersion ?? AGENT_VERSION,
+    schemaVersion: SCHEMA_VERSION,
     system: state.system,
     cpu: state.cpu,
     gpu: state.gpu,

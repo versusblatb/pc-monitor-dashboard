@@ -6,7 +6,7 @@ export const state = {
     os: null,
     arch: null,
     bios: null,
-    agentVersion: '2.0.0',
+    agentVersion: null,
     lastBoot: null,
   },
   cpu: {
@@ -44,7 +44,7 @@ export const state = {
     linkSpeedMbps: null,
   },
   disks: [],
-  processes: { total: 0, topCpu: [], topMemory: [] },
+  processes: null,
   uptime: null,
 };
 

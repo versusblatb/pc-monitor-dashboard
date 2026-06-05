@@ -3,11 +3,14 @@ import { WebSocketServer } from 'ws';
 import { AlertManager } from './alerts/alert-manager.js';
 import { TelegramConfigStore } from './alerts/telegram-config-store.js';
 import { HistoryManager } from './history/history-manager.js';
+import { describeMetricsShape } from './lib/metrics-shape.js';
 import {
+  mergeClientMetrics,
   normalizeAgentMessage,
   toClientPayload,
   validateIncomingSize,
 } from './lib/normalize-metrics.js';
+import { getEnvIncompleteWarning } from './alerts/telegram-env.js';
 import { setCors, corsOrigin } from './middleware/cors.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { handleAlertsRoute } from './routes/alerts.js';
@@ -57,9 +60,13 @@ async function initTelegramConfig() {
   if (!pool) {
     await telegramConfig.initFile();
   }
-  telegramConfig.seedFromEnv();
-  if (telegramConfig.get().source === 'env') {
-    console.log('[server] Telegram alerts loaded from env');
+  telegramConfig.applyEnvOverrideIfComplete();
+
+  const envWarn = getEnvIncompleteWarning();
+  if (envWarn) console.warn('[server]', envWarn);
+
+  if (telegramConfig.isManagedByEnv()) {
+    console.log('[server] Telegram alerts loaded from env (managed)');
   } else if (alerts.configured) {
     console.log('[server] Telegram alerts loaded from saved config');
   }
@@ -108,15 +115,53 @@ function broadcastStatus() {
   }
 }
 
+let firstV2DiagLogged = false;
+
+function logFirstV2Diagnostics(msg, normalized, incoming) {
+  if (firstV2DiagLogged || normalized.schemaVersion < 2) return;
+  firstV2DiagLogged = true;
+
+  const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload : {};
+  const topKeys = Object.keys(payload);
+  const sections = {
+    system: Boolean(incoming.system),
+    cpuInfo: Boolean(incoming.cpuInfo),
+    gpuInfo: Boolean(incoming.gpuInfo),
+    memoryInfo: Boolean(incoming.memoryInfo),
+    network: Boolean(incoming.network),
+    processes: incoming.processes != null,
+    disks: Array.isArray(incoming.disks) ? incoming.disks.length : 0,
+  };
+
+  console.log('[server] first schema v2 metrics:', {
+    schemaVersion: normalized.schemaVersion,
+    topLevelKeys: topKeys,
+    validation: 'ok',
+    normalizedSections: sections,
+    payloadBytes: Buffer.byteLength(String(raw), 'utf8'),
+    agentVersion: incoming.agentVersion ?? null,
+    hostname: incoming.hostname ?? null,
+  });
+}
+
 function handleAgentMetrics(raw) {
   try {
     validateIncomingSize(raw);
     const msg = JSON.parse(String(raw));
     const normalized = normalizeAgentMessage(msg);
-    if (!normalized) return;
+    if (!normalized) {
+      console.warn('[server] metrics rejected: invalid message shape', {
+        type: msg?.type,
+        reason: 'normalizeAgentMessage returned null',
+      });
+      return;
+    }
 
-    latest = toClientPayload(normalized);
+    const incoming = toClientPayload(normalized);
+    latest = mergeClientMetrics(latest, incoming);
     agentLastSeen = Date.now();
+
+    logFirstV2Diagnostics(msg, normalized, incoming);
 
     const { status } = updateStatus();
     history.onMetrics(latest, status);
@@ -171,6 +216,11 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname.startsWith('/api/alerts/')) {
     const handled = await handleAlertsRoute(req, res, url, alerts, telegramConfig, json);
     if (handled) return;
+  }
+
+  if (url.pathname === '/api/debug/metrics-shape' && process.env.DEBUG_METRICS === 'true') {
+    json(res, req, 200, describeMetricsShape(latest));
+    return;
   }
 
   const api = await handleApiRoute(url, {

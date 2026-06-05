@@ -48,6 +48,13 @@ export const translations = {
       gpuCard: 'Видеокарта',
       memory: 'Память',
     },
+    metricsState: {
+      loading: 'Ожидание данных агента',
+      pending: 'Сбор данных…',
+      unavailable: 'Метрика недоступна',
+      legacyAgent: 'Запущена устаревшая версия агента. Обновите и перезапустите PC Monitor Agent.',
+      empty: 'Данные пока пустые',
+    },
     disks: {
       title: 'Диски',
       used: 'занято',
@@ -106,6 +113,9 @@ export const translations = {
     settings: {
       perfTitle: 'Производительность UI',
       themeTitle: 'Тема',
+      diagnosticsTitle: 'Диагностика агента',
+      agentVersion: 'Версия агента',
+      schemaVersion: 'Версия схемы',
       telegramTitle: 'Telegram-уведомления',
       telegramHint: 'Настройте здесь — env на сервере не нужен. Токен хранится на сервере, в браузере не показывается.',
       telegramOn: 'Включено и настроено',
@@ -246,6 +256,13 @@ export const translations = {
       gpuCard: 'Graphics card',
       memory: 'Memory',
     },
+    metricsState: {
+      loading: 'Waiting for agent data',
+      pending: 'Collecting data…',
+      unavailable: 'Metric unavailable',
+      legacyAgent: 'Outdated agent version is running. Update and restart PC Monitor Agent.',
+      empty: 'No data yet',
+    },
     disks: {
       title: 'Disks',
       used: 'used',
@@ -304,6 +321,9 @@ export const translations = {
     settings: {
       perfTitle: 'UI performance',
       themeTitle: 'Theme',
+      diagnosticsTitle: 'Agent diagnostics',
+      agentVersion: 'Agent version',
+      schemaVersion: 'Schema version',
       telegramTitle: 'Telegram alerts',
       telegramHint: 'Configure here — no server env required. Token is stored on the server, never shown in the browser.',
       telegramOn: 'Enabled and configured',
