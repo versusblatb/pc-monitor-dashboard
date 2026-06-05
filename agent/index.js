@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import os from 'node:os';
 import { collectMetrics, warmupCpuBaseline } from './metrics.js';
 
-const SERVER_URL = process.env.SERVER_URL || 'ws://127.0.0.1:3847?role=agent';
+const SERVER_URL = process.env.SERVER_URL || 'wss://pc-monitor-dashboard.onrender.com?role=agent';
 const INTERVAL_MS = Number(process.env.INTERVAL_MS) || 1000;
 
 function connect() {
