@@ -134,7 +134,7 @@ export function loginCommandSession(password, req) {
     `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
     'HttpOnly',
     'Path=/',
-    'SameSite=Strict',
+    'SameSite=Lax',
     `Max-Age=${Math.floor(TTL_MS / 1000)}`,
     secure ? 'Secure' : '',
   ].filter(Boolean).join('; ');
@@ -151,7 +151,7 @@ export function logoutCommandSession(req) {
     `${SESSION_COOKIE}=`,
     'HttpOnly',
     'Path=/',
-    'SameSite=Strict',
+    'SameSite=Lax',
     'Max-Age=0',
     secure ? 'Secure' : '',
   ].filter(Boolean).join('; ');
@@ -161,8 +161,13 @@ export function logoutCommandSession(req) {
 /** @param {import('http').IncomingMessage} req */
 export function getSessionStatus(req) {
   const session = getSessionFromRequest(req);
-  if (!session) return { active: false };
-  return { active: true, expiresAt: session.expiresAt, csrf: session.csrf };
+  if (!session) return { active: false, authenticated: false };
+  return {
+    active: true,
+    authenticated: true,
+    expiresAt: session.expiresAt,
+    csrf: session.csrf,
+  };
 }
 
 export function clearAllSessions() {

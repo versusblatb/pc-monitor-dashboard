@@ -45,6 +45,8 @@ export function createCommandExecutor(ws, ctx) {
     const signature = msg?.payload?.signature;
     if (!command?.id || !command?.type) return;
 
+    console.log('[agent] remote command received:', command.type, command.id);
+
     if (!verifyCommandSignature(command, signature, COMMAND_SIGNING_SECRET)) {
       ctx.onInvalidSignature?.(command.id);
       return reject(ws, { payload: { command } }, 'INVALID_SIGNATURE');

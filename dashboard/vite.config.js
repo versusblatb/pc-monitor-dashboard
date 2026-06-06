@@ -31,7 +31,11 @@ export default defineConfig({
 
     proxy: {
       '/api': 'http://127.0.0.1:3847',
-
+      '/backend-api': {
+        target: 'http://127.0.0.1:3847',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/backend-api/, '/api'),
+      },
       '/ws': {
         target: 'ws://127.0.0.1:3847',
         ws: true,

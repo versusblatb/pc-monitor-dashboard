@@ -28,6 +28,11 @@
   min-width: 120px;
 }
 
+.rc-login .btn {
+  align-self: flex-start;
+  min-width: 140px;
+}
+
 .rc-apps {
   display: flex;
   flex-direction: column;
@@ -104,4 +109,20 @@
 
 .rc-msg {
   margin: 8px 0 0;
+}
+
+.rc-msg--error {
+  color: var(--danger, #f85149);
+  min-height: 1.25rem;
+}
+
+.rc-banner {
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.rc-banner--warn {
+  background: rgba(255, 176, 32, 0.12);
+  border: 1px solid rgba(255, 176, 32, 0.35);
 }

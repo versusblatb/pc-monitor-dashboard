@@ -390,7 +390,8 @@
 }
 
 .perf-full .lang-toggle,
-.perf-full .perf-btn {
+.perf-full .perf-btn,
+.perf-full .btn {
   transition:
     transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.25s ease,
@@ -399,7 +400,8 @@
 }
 
 .perf-full .lang-toggle:hover,
-.perf-full .perf-btn:hover {
+.perf-full .perf-btn:hover,
+.perf-full .btn:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.03);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }

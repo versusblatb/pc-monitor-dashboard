@@ -73,19 +73,4 @@ export const api = {
       method: 'POST',
       headers: configHeaders(configKey),
     }),
-  commandSessionStatus: () =>
-    apiFetch('/api/command-session/status', { credentials: 'include' }),
-  commandSessionLogin: (password) =>
-    apiFetch('/api/command-session/login', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    }),
-  commandSessionLogout: () =>
-    apiFetch('/api/command-session/logout', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    }),
 };

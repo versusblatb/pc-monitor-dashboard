@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { commandFetch } from '../api/command-client.js';
 import { useMetrics } from '../hooks/useMetrics.js';
 import {
-  commandFetch,
   randomIdempotencyKey,
+  resolveLoginErrorMessage,
   useCommandSession,
 } from '../hooks/useCommandSession.js';
 import { useI18n } from '../i18n/I18nProvider.jsx';
@@ -79,8 +80,18 @@ function ConfirmModal({ open, title, body, typedLabel, onConfirm, onCancel, dang
 export function RemoteControl() {
   const { t } = useI18n();
   const { online, hostname, lastSeen, metrics } = useMetrics();
-  const session = useCommandSession();
+  const {
+    sessionState,
+    commandsEnabled,
+    transientError,
+    login,
+    logout,
+    csrf,
+  } = useCommandSession();
+  const protectedLoadRef = useRef(0);
   const [password, setPassword] = useState('');
+  const [loginState, setLoginState] = useState('idle');
+  const [loginError, setLoginError] = useState('');
   const [caps, setCaps] = useState(null);
   const [apps, setApps] = useState([]);
   const [commands, setCommands] = useState([]);
@@ -91,33 +102,57 @@ export function RemoteControl() {
   const [msg, setMsg] = useState(null);
 
   const agentVersion = caps?.agentVersion ?? metrics?.agentVersion ?? '—';
+  const isAuthenticated = sessionState === 'authenticated';
 
-  const loadData = useCallback(async () => {
-    if (!session.active || !session.commandsEnabled) return;
-    try {
-      const [c, a, list, log] = await Promise.all([
-        commandFetch('/api/remote-control/capabilities'),
-        commandFetch('/api/remote-control/apps'),
-        commandFetch('/api/remote-control/commands'),
-        commandFetch('/api/remote-control/audit'),
-      ]);
-      setCaps(c);
-      setApps(a.apps ?? []);
-      setCommands(list.commands ?? []);
-      setAudit(log.audit ?? []);
-    } catch {
-      /* ignore */
-    }
-  }, [session.active, session.commandsEnabled]);
+  const clearProtectedData = useCallback(() => {
+    setCaps(null);
+    setApps([]);
+    setCommands([]);
+    setAudit([]);
+    setClearScan(null);
+  }, []);
+
+  const loadProtectedData = useCallback(async () => {
+    if (!isAuthenticated || !commandsEnabled) return;
+    const token = csrf();
+    const loadId = protectedLoadRef.current + 1;
+    protectedLoadRef.current = loadId;
+    const [c, a, list, log] = await Promise.all([
+      commandFetch('/remote-control/capabilities', {
+        headers: { 'X-CSRF-Token': token },
+      }),
+      commandFetch('/remote-control/apps', {
+        headers: { 'X-CSRF-Token': token },
+      }),
+      commandFetch('/remote-control/commands', {
+        headers: { 'X-CSRF-Token': token },
+      }),
+      commandFetch('/remote-control/audit', {
+        headers: { 'X-CSRF-Token': token },
+      }),
+    ]);
+    if (protectedLoadRef.current !== loadId) return;
+    setCaps(c);
+    setApps(a.apps ?? []);
+    setCommands(list.commands ?? []);
+    setAudit(log.audit ?? []);
+  }, [isAuthenticated, commandsEnabled, csrf]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!isAuthenticated) {
+      protectedLoadRef.current += 1;
+      clearProtectedData();
+      return;
+    }
+    loadProtectedData().catch(() => {
+      /* protected fetch errors handled silently; session poll will recover */
+    });
+  }, [isAuthenticated, loadProtectedData, clearProtectedData]);
 
   useEffect(() => {
     const onUpdate = (e) => {
       const cmd = e.detail;
-      if (!cmd?.id) return;
+      if (!cmd?.id || !isAuthenticated) return;
       setCommands((prev) => {
         const idx = prev.findIndex((c) => c.id === cmd.id);
         if (idx < 0) return [cmd, ...prev].slice(0, 50);
@@ -128,7 +163,7 @@ export function RemoteControl() {
     };
     window.addEventListener('pcm-command-update', onUpdate);
     return () => window.removeEventListener('pcm-command-update', onUpdate);
-  }, []);
+  }, [isAuthenticated]);
 
   const sendCommand = async (type, params = {}, confirmation) => {
     setBusy(true);
@@ -141,15 +176,16 @@ export function RemoteControl() {
         confirmation,
         idempotencyKey: randomIdempotencyKey(),
       };
-      const res = await commandFetch('/api/remote-control/commands', {
+      const res = await commandFetch('/remote-control/commands', {
         method: 'POST',
+        headers: { 'X-CSRF-Token': csrf() },
         body: JSON.stringify(body),
       });
       if (res.command) {
         setCommands((prev) => [res.command, ...prev.filter((c) => c.id !== res.command.id)].slice(0, 50));
       }
       setMsg(t('remote.sent'));
-      await loadData();
+      await loadProtectedData();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : t('remote.failed'));
     } finally {
@@ -163,44 +199,29 @@ export function RemoteControl() {
   };
 
   const cap = (key) => caps?.capabilities?.[key] === true;
-
-  const disabledGlobal = !session.commandsEnabled;
+  const disabledGlobal = !commandsEnabled;
   const disabledOffline = !online;
 
-  const loginForm = (
-    <section className="panel rc-login">
-      <h2 className="section-title">{t('remote.loginTitle')}</h2>
-      <p className="muted">{t('remote.loginHint')}</p>
-      <input
-        className="search-input"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder={t('remote.password')}
-        autoComplete="current-password"
-      />
-      <button
-        type="button"
-        className="btn"
-        disabled={!password || busy}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await session.login(password);
-            setPassword('');
-          } catch (e) {
-            setMsg(e instanceof Error ? e.message : t('remote.loginFailed'));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        {t('remote.login')}
-      </button>
-    </section>
-  );
+  const handleLoginSubmit = async (event) => {
+    event.preventDefault();
+    if (!password || loginState === 'submitting') return;
 
-  if (session.loading) return <p className="muted">{t('common.loading')}</p>;
+    setLoginError('');
+    setLoginState('submitting');
+
+    try {
+      await login(password);
+      setPassword('');
+      setLoginState('success');
+    } catch (err) {
+      setLoginState('error');
+      setLoginError(resolveLoginErrorMessage(err, t));
+    }
+  };
+
+  if (sessionState === 'initializing') {
+    return <p className="muted">{t('common.loading')}</p>;
+  }
 
   if (disabledGlobal) {
     return (
@@ -211,7 +232,39 @@ export function RemoteControl() {
     );
   }
 
-  if (!session.active) return loginForm;
+  if (!isAuthenticated) {
+    return (
+      <section className="panel rc-login">
+        <h2 className="section-title">{t('remote.loginTitle')}</h2>
+        <p className="muted">{t('remote.loginHint')}</p>
+        {transientError && sessionState === 'error' && (
+          <p className="rc-banner rc-banner--warn">{t('remote.errors.serverUnavailable')}</p>
+        )}
+        <form onSubmit={handleLoginSubmit} noValidate>
+          <input
+            className="search-input"
+            type="password"
+            name="command-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('remote.password')}
+            autoComplete="current-password"
+            disabled={loginState === 'submitting'}
+          />
+          <div role="alert" aria-live="polite" className="rc-msg rc-msg--error">
+            {loginError}
+          </div>
+          <button
+            type="submit"
+            className="btn"
+            disabled={!password || loginState === 'submitting'}
+          >
+            {loginState === 'submitting' ? t('remote.checking') : t('remote.login')}
+          </button>
+        </form>
+      </section>
+    );
+  }
 
   const modalTitle = modal ? t(`remote.commands.${modal.type}`, modal.type) : '';
 
@@ -227,10 +280,33 @@ export function RemoteControl() {
         onConfirm={() => modal && sendCommand(modal.type, modal.params, DANGEROUS.has(modal.type) ? modal.type : undefined)}
       />
 
+      {transientError && (
+        <p className="rc-banner rc-banner--warn">{transientError}</p>
+      )}
+
+      {caps?.capabilities?.executionMode === 'mock' && (
+        <p className="rc-banner rc-banner--warn">{t('remote.mockMode')}</p>
+      )}
+
+      {!caps?.agentOnline && (
+        <p className="rc-banner rc-banner--warn">{t('remote.agentOfflineHint')}</p>
+      )}
+
       <section className="panel">
         <div className="rc-head">
           <h2 className="section-title">{t('remote.title')}</h2>
-          <button type="button" className="btn btn--ghost" onClick={() => session.logout()}>{t('remote.logout')}</button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={async () => {
+              await logout();
+              clearProtectedData();
+              setLoginState('idle');
+              setLoginError('');
+            }}
+          >
+            {t('remote.logout')}
+          </button>
         </div>
         {msg && <p className="rc-msg">{msg}</p>}
         <dl className="info-grid rc-status">
@@ -284,8 +360,9 @@ export function RemoteControl() {
             onClick={async () => {
               setBusy(true);
               try {
-                const res = await commandFetch('/api/remote-control/commands', {
+                const res = await commandFetch('/remote-control/commands', {
                   method: 'POST',
+                  headers: { 'X-CSRF-Token': csrf() },
                   body: JSON.stringify({
                     deviceId: caps?.deviceId,
                     type: 'CLEAR_TEMP',

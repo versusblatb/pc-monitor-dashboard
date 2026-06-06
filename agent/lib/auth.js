@@ -4,6 +4,7 @@ import {
   AGENT_VERSION,
   ALLOW_REMOTE_COMMANDS,
   ALLOW_SCREENSHOT,
+  COMMAND_EXECUTION_MODE,
   SCHEMA_VERSION,
 } from '../config.js';
 import { getPublicAppsList } from './apps-config.js';
@@ -33,5 +34,6 @@ export function buildCapabilities() {
     clearTemp: ALLOW_REMOTE_COMMANDS,
     screenshot: ALLOW_REMOTE_COMMANDS && ALLOW_SCREENSHOT,
     apps: getPublicAppsList(),
+    executionMode: COMMAND_EXECUTION_MODE,
   };
 }
