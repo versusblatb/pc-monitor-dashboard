@@ -30,7 +30,7 @@ import { createCommandTelegramNotifier } from './commands/telegram-command-alert
 
 const PORT = Number(process.env.PORT) || 3847;
 const HOST = process.env.HOST || '0.0.0.0';
-const OFFLINE_TIMEOUT_MS = Number(process.env.OFFLINE_TIMEOUT_MS) || 12_000;
+const OFFLINE_TIMEOUT_MS = Number(process.env.OFFLINE_TIMEOUT_MS) || 45_000;
 
 /** @type {import('ws').WebSocket | null} */
 let agentSocket = null;
@@ -383,9 +383,12 @@ wss.on('connection', (ws, req) => {
 
   if (role === 'agent') {
     if (agentSocket && agentSocket !== ws && agentSocket.readyState === 1) {
-      console.log('[server] agent already connected, rejecting duplicate');
-      ws.close(4000, 'agent already connected');
-      return;
+      console.log('[server] replacing previous agent connection');
+      try {
+        agentSocket.close(4001, 'replaced by new connection');
+      } catch {
+        /* ignore */
+      }
     }
     agentSocket = ws;
     initAgentConnection(ws);

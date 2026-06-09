@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { capturePrimaryScreenJpegBase64 } from '../lib/screenshot-win.js';
+import { spawnDetached } from '../lib/spawn-detached.js';
 import { spawnSafe } from './spawn-safe.js';
 import { getAppById } from '../lib/apps-config.js';
 import {
@@ -35,20 +37,34 @@ export async function handleLock() {
 export async function handleSleep() {
   if (COMMAND_EXECUTION_MODE === 'mock') return { message: 'sleep (mock)' };
   try {
-    await spawnSafe('rundll32.exe', ['powrprof.dll,SetSuspendState', '0', '1', '0']);
+    await spawnSafe(
+      'powershell.exe',
+      ['-NoProfile', '-Command', 'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState($false,$false,$false)'],
+      { timeoutMs: 5000 },
+    );
     return { message: 'sleep initiated' };
   } catch {
-    return { errorCode: 'UNSUPPORTED', message: 'sleep not supported' };
+    try {
+      await spawnSafe('rundll32.exe', ['powrprof.dll,SetSuspendState', '0', '1', '0'], { timeoutMs: 5000 });
+      return { message: 'sleep initiated' };
+    } catch {
+      return { errorCode: 'UNSUPPORTED', message: 'sleep not supported on this PC' };
+    }
   }
 }
 
 export async function handleHibernate() {
   if (COMMAND_EXECUTION_MODE === 'mock') return { message: 'hibernate (mock)' };
   try {
-    await spawnSafe('rundll32.exe', ['powrprof.dll,SetSuspendState', '1', '1', '0']);
+    await spawnSafe('shutdown.exe', ['/h'], { timeoutMs: 5000 });
     return { message: 'hibernate initiated' };
   } catch {
-    return { errorCode: 'UNSUPPORTED', message: 'hibernate not supported' };
+    try {
+      await spawnSafe('rundll32.exe', ['powrprof.dll,SetSuspendState', '1', '1', '0'], { timeoutMs: 5000 });
+      return { message: 'hibernate initiated' };
+    } catch {
+      return { errorCode: 'UNSUPPORTED', message: 'hibernate not supported on this PC' };
+    }
   }
 }
 
@@ -68,12 +84,15 @@ export async function handleRestart() {
 export async function handleLaunchApp(params) {
   const app = getAppById(params?.appId ?? '');
   if (!app) return { errorCode: 'APP_NOT_ALLOWED', message: 'app not in whitelist' };
-  if (COMMAND_EXECUTION_MODE === 'mock') return { message: `launch ${app.id} (mock)` };
-  const result = await spawnSafe(app.executable, app.args, { timeoutMs: 8000 });
-  if (result.code !== 0 && result.code != null) {
+  if (COMMAND_EXECUTION_MODE === 'mock') return { message: `launch ${app.id} (mock)`, pid: null };
+  try {
+    const result = await spawnDetached(app.executable, app.args);
+    if (!result.pid) return { errorCode: 'LAUNCH_FAILED', message: 'failed to launch app' };
+    launchedPids.set(app.id, result.pid);
+    return { message: `launched ${app.label}`, pid: result.pid, appId: app.id };
+  } catch {
     return { errorCode: 'LAUNCH_FAILED', message: 'failed to launch app' };
   }
-  return { message: `launched ${app.label}` };
 }
 
 /** @param {{ appId?: string }} params */
@@ -169,7 +188,20 @@ function isBlockedPath(p) {
 export async function handleScreenshot() {
   if (!ALLOW_SCREENSHOT) return { errorCode: 'SCREENSHOT_DISABLED', message: 'screenshot disabled' };
   if (COMMAND_EXECUTION_MODE === 'mock') {
-    return { message: 'screenshot (mock)', downloadToken: 'mock-token', expiresInMs: SCREENSHOT_TTL_MS };
+    return { message: 'screenshot (mock)', mimeType: 'image/jpeg', expiresInMs: SCREENSHOT_TTL_MS };
   }
-  return { errorCode: 'SCREENSHOT_UNAVAILABLE', message: 'screenshot capture not installed in this build' };
+  if (process.platform !== 'win32') {
+    return { errorCode: 'SCREENSHOT_UNAVAILABLE', message: 'screenshot supported on Windows only' };
+  }
+  try {
+    const imageBase64 = await capturePrimaryScreenJpegBase64();
+    return {
+      message: 'screenshot captured',
+      mimeType: 'image/jpeg',
+      imageBase64,
+      expiresInMs: SCREENSHOT_TTL_MS,
+    };
+  } catch {
+    return { errorCode: 'SCREENSHOT_FAILED', message: 'failed to capture screenshot' };
+  }
 }

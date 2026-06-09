@@ -126,3 +126,63 @@
   background: rgba(255, 176, 32, 0.12);
   border: 1px solid rgba(255, 176, 32, 0.35);
 }
+
+.rc-banner--ok {
+  background: rgba(63, 185, 80, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.35);
+}
+
+.rc-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border, #30363d);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rc-chip--ok {
+  border-color: rgba(63, 185, 80, 0.45);
+  color: var(--ok, #3fb950);
+}
+
+.rc-chip--warn {
+  border-color: rgba(255, 176, 32, 0.45);
+  color: #ffb020;
+}
+
+.rc-chip--danger {
+  border-color: rgba(248, 81, 73, 0.45);
+  color: #f85149;
+}
+
+.rc-msg--ok {
+  color: var(--ok, #3fb950);
+}
+
+.rc-row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rc-shot-modal img {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border, #30363d);
+  margin-top: 12px;
+}
+
+.status-pill--rc-pending { color: #ffb020; }
+.status-pill--rc-running { color: #58a6ff; }
+.status-pill--rc-ok { color: #3fb950; }
+.status-pill--rc-fail { color: #f85149; }

@@ -107,4 +107,10 @@ export const commandApi = {
       headers: { 'X-CSRF-Token': csrf },
       body: JSON.stringify(body),
     }),
+  cancelCommand: (id, csrf) =>
+    commandFetch(`/remote-control/commands/${id}/cancel`, {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrf },
+      body: JSON.stringify({}),
+    }),
 };

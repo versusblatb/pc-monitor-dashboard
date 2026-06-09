@@ -92,12 +92,6 @@ export class CommandManager {
       ...meta,
     });
 
-    await this.onTelegramAlert({
-      kind: 'command_requested',
-      command,
-      hostname: agent.hostname,
-    });
-
     if (this.isAgentOnline()) {
       await this.deliverCommand(command);
     }
@@ -185,6 +179,12 @@ export class CommandManager {
     if (['RESTART', 'SHUTDOWN', 'SCREENSHOT'].includes(cmd.type)) {
       await this.onTelegramAlert({
         kind: status === 'succeeded' ? 'dangerous_succeeded' : 'dangerous_rejected',
+        command: updated,
+        hostname: this.getAgentInfo()?.hostname,
+      });
+    } else if (status === 'failed') {
+      await this.onTelegramAlert({
+        kind: 'command_failed',
         command: updated,
         hostname: this.getAgentInfo()?.hostname,
       });

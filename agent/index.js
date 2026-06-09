@@ -26,6 +26,9 @@ import { collectDisks, collectNetwork } from './collectors/medium.js';
 import { collectProcesses } from './collectors/slow.js';
 import { buildAgentAuthMessage } from './lib/auth.js';
 import { createCommandExecutor } from './commands/executor.js';
+import { acquireAgentLock } from './lib/single-instance.js';
+
+acquireAgentLock();
 
 /** @type {ReturnType<typeof setInterval>[]} */
 const timers = [];
@@ -240,10 +243,14 @@ function connect() {
     if (shuttingDown) return;
 
     if (code === 4000) {
-      if (!shuttingDown) {
-        console.error('[agent] another agent already active — stop other agents, retry in 30s');
-        setTimeout(connect, DUPLICATE_AGENT_DELAY_MS);
-      }
+      console.error('[agent] duplicate connection rejected — ensure only one agent instance is running');
+      setTimeout(connect, DUPLICATE_AGENT_DELAY_MS);
+      return;
+    }
+
+    if (code === 4001) {
+      console.warn('[agent] connection replaced by newer session, reconnecting…');
+      setTimeout(connect, 2000);
       return;
     }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { commandFetch } from '../api/command-client.js';
+import { commandApi, commandFetch } from '../api/command-client.js';
 import { useMetrics } from '../hooks/useMetrics.js';
 import {
   randomIdempotencyKey,
@@ -10,11 +10,30 @@ import { useI18n } from '../i18n/I18nProvider.jsx';
 import './RemoteControl.css';
 
 const DANGEROUS = new Set(['RESTART', 'SHUTDOWN', 'SCREENSHOT']);
+const ACTIVE_STATUSES = new Set(['pending', 'sent', 'acknowledged', 'running']);
 
 function statusLabel(status, t) {
   const key = `remote.status.${status}`;
   const label = t(key);
   return label !== key ? label : status;
+}
+
+function statusClass(status) {
+  if (status === 'succeeded') return 'status-pill--rc-ok';
+  if (status === 'failed' || status === 'expired' || status === 'cancelled') return 'status-pill--rc-fail';
+  if (status === 'running') return 'status-pill--rc-running';
+  return 'status-pill--rc-pending';
+}
+
+/** @param {unknown} err */
+function resolveCommandError(err, t) {
+  const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+  const payload = err && typeof err === 'object' && 'payload' in err ? err.payload : null;
+  const serverError = payload?.error;
+  if (typeof serverError === 'string') return serverError;
+  if (serverError && typeof serverError === 'object' && serverError.message) return String(serverError.message);
+  if (code === 'AGENT_NOT_AUTHENTICATED') return t('remote.agentOfflineHint');
+  return err instanceof Error ? err.message : t('remote.failed');
 }
 
 function ConfirmModal({ open, title, body, typedLabel, onConfirm, onCancel, dangerous }) {
@@ -100,9 +119,13 @@ export function RemoteControl() {
   const [busy, setBusy] = useState(false);
   const [clearScan, setClearScan] = useState(null);
   const [msg, setMsg] = useState(null);
+  const [msgKind, setMsgKind] = useState('info');
+  const [screenshot, setScreenshot] = useState(null);
 
   const agentVersion = caps?.agentVersion ?? metrics?.agentVersion ?? '—';
+  const agentReady = Boolean(caps?.agentOnline);
   const isAuthenticated = sessionState === 'authenticated';
+  const hasActiveCommands = commands.some((c) => ACTIVE_STATUSES.has(c.status));
 
   const clearProtectedData = useCallback(() => {
     setCaps(null);
@@ -165,7 +188,41 @@ export function RemoteControl() {
     return () => window.removeEventListener('pcm-command-update', onUpdate);
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !hasActiveCommands) return undefined;
+    const id = setInterval(() => {
+      loadProtectedData().catch(() => {});
+    }, 3000);
+    return () => clearInterval(id);
+  }, [isAuthenticated, hasActiveCommands, loadProtectedData]);
+
+  const applyCommandResult = (command) => {
+    if (!command) return;
+    if (command.type === 'SCREENSHOT' && command.status === 'succeeded' && command.result?.imageBase64) {
+      setScreenshot({
+        mimeType: command.result.mimeType || 'image/jpeg',
+        data: command.result.imageBase64,
+      });
+    }
+    if (command.status === 'succeeded') {
+      setMsgKind('ok');
+      setMsg(t('remote.commandSucceeded'));
+    } else if (command.status === 'failed') {
+      setMsgKind('error');
+      setMsg(command.errorCode || t('remote.commandFailed'));
+    } else {
+      setMsgKind('info');
+      setMsg(t('remote.commandQueued'));
+    }
+  };
+
   const sendCommand = async (type, params = {}, confirmation) => {
+    if (!agentReady) {
+      setMsgKind('error');
+      setMsg(t('remote.agentOfflineHint'));
+      return;
+    }
+
     setBusy(true);
     setMsg(null);
     try {
@@ -176,21 +233,34 @@ export function RemoteControl() {
         confirmation,
         idempotencyKey: randomIdempotencyKey(),
       };
-      const res = await commandFetch('/remote-control/commands', {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': csrf() },
-        body: JSON.stringify(body),
-      });
+      const res = await commandApi.createCommand(body, csrf());
       if (res.command) {
         setCommands((prev) => [res.command, ...prev.filter((c) => c.id !== res.command.id)].slice(0, 50));
+        applyCommandResult(res.command);
+      } else {
+        setMsgKind('info');
+        setMsg(t('remote.commandQueued'));
       }
-      setMsg(t('remote.sent'));
       await loadProtectedData();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : t('remote.failed'));
+      setMsgKind('error');
+      setMsg(resolveCommandError(e, t));
     } finally {
       setBusy(false);
       setModal(null);
+    }
+  };
+
+  const cancelCommand = async (id) => {
+    setBusy(true);
+    try {
+      await commandApi.cancelCommand(id, csrf());
+      await loadProtectedData();
+    } catch (e) {
+      setMsgKind('error');
+      setMsg(resolveCommandError(e, t));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -200,7 +270,7 @@ export function RemoteControl() {
 
   const cap = (key) => caps?.capabilities?.[key] === true;
   const disabledGlobal = !commandsEnabled;
-  const disabledOffline = !online;
+  const disabledOffline = !agentReady;
 
   const handleLoginSubmit = async (event) => {
     event.preventDefault();
@@ -288,30 +358,49 @@ export function RemoteControl() {
         <p className="rc-banner rc-banner--warn">{t('remote.mockMode')}</p>
       )}
 
-      {!caps?.agentOnline && (
-        <p className="rc-banner rc-banner--warn">{t('remote.agentOfflineHint')}</p>
+      {agentReady ? (
+        <p className="rc-banner rc-banner--ok">{t('remote.agentReady')}</p>
+      ) : (
+        <p className="rc-banner rc-banner--warn">{online ? t('remote.agentUnstable') : t('remote.agentOfflineHint')}</p>
       )}
 
       <section className="panel">
         <div className="rc-head">
           <h2 className="section-title">{t('remote.title')}</h2>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={async () => {
-              await logout();
-              clearProtectedData();
-              setLoginState('idle');
-              setLoginError('');
-            }}
-          >
-            {t('remote.logout')}
-          </button>
+          <div className="rc-row-actions">
+            <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => loadProtectedData()}>
+              {t('remote.refresh')}
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={async () => {
+                await logout();
+                clearProtectedData();
+                setLoginState('idle');
+                setLoginError('');
+              }}
+            >
+              {t('remote.logout')}
+            </button>
+          </div>
         </div>
-        {msg && <p className="rc-msg">{msg}</p>}
+        <div className="rc-status-strip">
+          <span className={`rc-chip ${agentReady ? 'rc-chip--ok' : 'rc-chip--warn'}`}>
+            {agentReady ? t('remote.agentReady') : t('remote.agentOfflineHint')}
+          </span>
+          {caps?.capabilities?.executionMode && (
+            <span className="rc-chip">{`mode: ${caps.capabilities.executionMode}`}</span>
+          )}
+          {!cap('screenshot') && (
+            <span className="rc-chip rc-chip--warn">{t('remote.screenshotDisabled')}</span>
+          )}
+        </div>
+        {msg && <p className={`rc-msg ${msgKind === 'ok' ? 'rc-msg--ok' : msgKind === 'error' ? 'rc-msg--error' : ''}`}>{msg}</p>}
+        {hasActiveCommands && <p className="muted">{t('remote.pendingHint')}</p>}
         <dl className="info-grid rc-status">
           <div className="info-row"><dt>{t('remote.device')}</dt><dd>{hostname}</dd></div>
-          <div className="info-row"><dt>{t('remote.online')}</dt><dd>{online ? t('conn.connected') : t('agent.offline')}</dd></div>
+          <div className="info-row"><dt>{t('remote.online')}</dt><dd>{agentReady ? t('conn.connected') : (online ? t('remote.agentUnstable') : t('agent.offline'))}</dd></div>
           <div className="info-row"><dt>{t('remote.agentVersion')}</dt><dd>{agentVersion}</dd></div>
           <div className="info-row"><dt>{t('lastSeen')}</dt><dd>{lastSeen ? new Date(lastSeen).toLocaleString() : '—'}</dd></div>
         </dl>
@@ -419,6 +508,7 @@ export function RemoteControl() {
                 <th>{t('remote.colCommand')}</th>
                 <th>{t('remote.colStatus')}</th>
                 <th>{t('remote.colError')}</th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -426,8 +516,24 @@ export function RemoteControl() {
                 <tr key={c.id}>
                   <td>{new Date(c.createdAt).toLocaleString()}</td>
                   <td>{c.type}</td>
-                  <td>{statusLabel(c.status, t)}</td>
+                  <td><span className={`status-pill ${statusClass(c.status)}`}>{statusLabel(c.status, t)}</span></td>
                   <td>{c.errorCode ?? '—'}</td>
+                  <td>
+                    {['pending', 'sent'].includes(c.status) && (
+                      <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => cancelCommand(c.id)}>
+                        {t('remote.cancel')}
+                      </button>
+                    )}
+                    {c.type === 'SCREENSHOT' && c.status === 'succeeded' && c.result?.imageBase64 && (
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        onClick={() => setScreenshot({ mimeType: c.result.mimeType || 'image/jpeg', data: c.result.imageBase64 })}
+                      >
+                        {t('remote.screenshotPreview')}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -446,6 +552,18 @@ export function RemoteControl() {
           ))}
         </ul>
       </section>
+
+      {screenshot && (
+        <div className="rc-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="rc-modal rc-shot-modal">
+            <h3>{t('remote.screenshotPreview')}</h3>
+            <img src={`data:${screenshot.mimeType};base64,${screenshot.data}`} alt={t('remote.screenshotPreview')} />
+            <div className="rc-modal__actions">
+              <button type="button" className="btn" onClick={() => setScreenshot(null)}>{t('remote.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

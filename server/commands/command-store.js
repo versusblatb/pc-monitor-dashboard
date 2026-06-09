@@ -148,14 +148,14 @@ export class CommandStore {
     if (this.pool) {
       const { rows } = await this.pool.query(
         `SELECT * FROM remote_commands
-         WHERE device_id = $1 AND status = 'pending' AND expires_at > $2
+         WHERE device_id = $1 AND status IN ('pending', 'sent') AND expires_at > $2
          ORDER BY created_at ASC`,
         [deviceId, now],
       );
       return rows.map(mapCommandRow);
     }
     return [...this.memory.values()].filter(
-      (c) => c.deviceId === deviceId && c.status === 'pending' && c.expiresAt > now,
+      (c) => c.deviceId === deviceId && ['pending', 'sent'].includes(c.status) && c.expiresAt > now,
     );
   }
 

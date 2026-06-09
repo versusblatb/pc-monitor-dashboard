@@ -1,4 +1,5 @@
 import { AlertCooldown } from './cooldown.js';
+import { ConnectionHysteresis } from './connection-hysteresis.js';
 import { escapeHtml, sendTelegram } from './telegram.js';
 
 export class AlertManager {
@@ -6,7 +7,7 @@ export class AlertManager {
   constructor(store) {
     this.store = store;
     this.cooldown = new AlertCooldown(Number(process.env.ALERT_COOLDOWN_MS) || 900_000);
-    this.wasOnline = false;
+    this.connection = new ConnectionHysteresis();
     this.queue = Promise.resolve();
   }
 
@@ -39,13 +40,13 @@ export class AlertManager {
     const host = escapeHtml(String(ctx.metrics?.hostname ?? 'PC'));
     const time = new Date().toLocaleString('ru-RU');
 
-    if (ctx.online && !this.wasOnline) {
+    const connectionEvent = this.connection.evaluate(ctx.online);
+    if (connectionEvent === 'online') {
       this.enqueue(`🟢 <b>PC Monitor: ПК онлайн</b>\nУстройство: ${host}\nВремя: ${time}`);
     }
-    if (!ctx.online && this.wasOnline) {
+    if (connectionEvent === 'offline') {
       this.enqueue(`🔴 <b>PC Monitor: ПК офлайн</b>\nУстройство: ${host}\nВремя: ${time}`);
     }
-    this.wasOnline = ctx.online;
 
     if (!ctx.changed || !ctx.online || !ctx.metrics) return;
 
