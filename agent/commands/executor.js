@@ -22,6 +22,8 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DISABLE_FILE = path.join(__dirname, '..', 'data', 'disable-remote-control');
 
+const COMMAND_TIMEOUT_MS = 90_000;
+
 const HANDLERS = {
   LOCK: handleLock,
   SLEEP: handleSleep,
@@ -74,7 +76,12 @@ export function createCommandExecutor(ws, ctx) {
 
     try {
       sendAck(ws, command.id, 'running');
-      const result = await handler(command.params ?? {});
+      const result = await Promise.race([
+        handler(command.params ?? {}),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('COMMAND_TIMEOUT')), COMMAND_TIMEOUT_MS);
+        }),
+      ]);
       if (result?.errorCode) {
         sendResult(ws, command.id, 'failed', result, result.errorCode);
       } else {

@@ -13,7 +13,7 @@ export async function handleRemoteControlRoute(req, res, url, commands, json) {
   const path = url.pathname;
   if (!path.startsWith('/api/remote-control/')) return false;
 
-  if (req.method === 'POST' && !validateOrigin(req)) {
+  if ((req.method === 'POST' || req.method === 'PUT') && !validateOrigin(req)) {
     json(res, req, 403, { error: 'origin not allowed' });
     return true;
   }
@@ -41,8 +41,29 @@ export async function handleRemoteControlRoute(req, res, url, commands, json) {
 
   if (path === '/api/remote-control/apps' && req.method === 'GET') {
     const caps = commands.getAgentInfo()?.capabilities;
-    const apps = caps?.apps ?? [];
-    json(res, req, 200, { apps });
+    const agentApps = caps?.apps ?? [];
+    const serverApps = commands.apps?.listPublic?.() ?? [];
+    const apps = agentApps.length ? agentApps : serverApps;
+    json(res, req, 200, {
+      apps,
+      editable: commands.isAgentOnline?.() ?? false,
+      serverStored: serverApps.length,
+    });
+    return true;
+  }
+
+  if (path === '/api/remote-control/apps' && req.method === 'PUT') {
+    try {
+      const body = await readJsonBody(req);
+      const result = commands.updateApps(body.apps ?? []);
+      if (!result.ok) {
+        json(res, req, 400, { ok: false, error: result.error });
+        return true;
+      }
+      json(res, req, 200, { ok: true, apps: result.apps, synced: Boolean(result.synced) });
+    } catch {
+      json(res, req, 400, { error: 'invalid request' });
+    }
     return true;
   }
 
@@ -74,7 +95,11 @@ export async function handleRemoteControlRoute(req, res, url, commands, json) {
         json(res, req, 404, { error: 'not found' });
         return true;
       }
-      json(res, req, 200, { command: commands.publicCommand(cmd) });
+      json(res, req, 200, {
+        command: commands.publicCommand(cmd, {
+          includeImage: cmd.type === 'SCREENSHOT' && cmd.status === 'succeeded',
+        }),
+      });
       return true;
     }
     if (req.method === 'POST' && url.pathname.endsWith('/cancel')) {

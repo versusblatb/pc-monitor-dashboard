@@ -24,6 +24,7 @@ import {
 } from './collectors/fast.js';
 import { collectDisks, collectNetwork } from './collectors/medium.js';
 import { collectProcesses } from './collectors/slow.js';
+import { replaceAppsConfig } from './lib/apps-config.js';
 import { buildAgentAuthMessage } from './lib/auth.js';
 import { createCommandExecutor } from './commands/executor.js';
 import { acquireAgentLock } from './lib/single-instance.js';
@@ -229,6 +230,11 @@ function connect() {
       }
       if (msg.type === 'remote_command') {
         await executeCommand(msg);
+        return;
+      }
+      if (msg.type === 'apps_config' && Array.isArray(msg.payload?.apps)) {
+        const apps = replaceAppsConfig(msg.payload.apps);
+        ws.send(JSON.stringify({ type: 'apps_config_ack', payload: { ok: true, apps } }));
         return;
       }
     } catch (err) {

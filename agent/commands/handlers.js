@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { launchWindowsApp } from '../lib/launch-win.js';
 import { capturePrimaryScreenJpegBase64 } from '../lib/screenshot-win.js';
-import { spawnDetached } from '../lib/spawn-detached.js';
 import { spawnSafe } from './spawn-safe.js';
 import { getAppById } from '../lib/apps-config.js';
 import {
@@ -86,12 +86,13 @@ export async function handleLaunchApp(params) {
   if (!app) return { errorCode: 'APP_NOT_ALLOWED', message: 'app not in whitelist' };
   if (COMMAND_EXECUTION_MODE === 'mock') return { message: `launch ${app.id} (mock)`, pid: null };
   try {
-    const result = await spawnDetached(app.executable, app.args);
-    if (!result.pid) return { errorCode: 'LAUNCH_FAILED', message: 'failed to launch app' };
-    launchedPids.set(app.id, result.pid);
-    return { message: `launched ${app.label}`, pid: result.pid, appId: app.id };
-  } catch {
-    return { errorCode: 'LAUNCH_FAILED', message: 'failed to launch app' };
+    const result = await launchWindowsApp(app.executable, app.args);
+    if (!result.launched) return { errorCode: 'LAUNCH_FAILED', message: 'failed to launch app' };
+    if (result.pid) launchedPids.set(app.id, result.pid);
+    return { message: `launched ${app.label}`, pid: result.pid ?? null, appId: app.id };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'failed to launch app';
+    return { errorCode: 'LAUNCH_FAILED', message };
   }
 }
 
@@ -194,14 +195,17 @@ export async function handleScreenshot() {
     return { errorCode: 'SCREENSHOT_UNAVAILABLE', message: 'screenshot supported on Windows only' };
   }
   try {
-    const imageBase64 = await capturePrimaryScreenJpegBase64();
+    const shot = await capturePrimaryScreenJpegBase64();
     return {
       message: 'screenshot captured',
       mimeType: 'image/jpeg',
-      imageBase64,
+      imageBase64: shot.base64,
+      bytes: shot.bytes,
       expiresInMs: SCREENSHOT_TTL_MS,
+      telegramHint: 'sent via server',
     };
-  } catch {
-    return { errorCode: 'SCREENSHOT_FAILED', message: 'failed to capture screenshot' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'failed to capture screenshot';
+    return { errorCode: 'SCREENSHOT_FAILED', message };
   }
 }

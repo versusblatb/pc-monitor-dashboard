@@ -3,6 +3,7 @@ import { AuditStore } from './audit-store.js';
 import { getConfirmationLevel, getCommandTtlMs } from './command-types.js';
 import { validateCommandParams, validateCommandType, validateConfirmation } from './command-schema.js';
 import { signCommand } from './command-signing.js';
+import { AppsRegistry } from './apps-registry.js';
 import { CommandStore } from './command-store.js';
 import { isCommandsAvailable, signingSecret } from './commands-config.js';
 
@@ -10,6 +11,7 @@ export class CommandManager {
   constructor() {
     this.store = new CommandStore();
     this.audit = new AuditStore();
+    this.apps = new AppsRegistry();
     /** @type {import('ws').WebSocket | null} */
     this.agentSocket = null;
     /** @type {() => boolean} */
@@ -162,9 +164,24 @@ export class CommandManager {
     if (!cmd) return { ok: false };
 
     const status = payload.status === 'succeeded' ? 'succeeded' : 'failed';
+    const rawResult = payload.result ?? null;
+
+    if (cmd.type === 'SCREENSHOT' && status === 'succeeded' && rawResult?.imageBase64) {
+      await this.onTelegramAlert({
+        kind: 'screenshot_photo',
+        command: cmd,
+        hostname: this.getAgentInfo()?.hostname,
+        imageBase64: rawResult.imageBase64,
+      });
+    }
+
+    const storedResult = rawResult?.imageBase64
+      ? { ...rawResult, telegramSent: cmd.type === 'SCREENSHOT' && status === 'succeeded' }
+      : rawResult;
+
     const updated = await this.store.update(id, {
       status,
-      result: payload.result ?? null,
+      result: storedResult,
       errorCode: payload.errorCode ?? null,
       completedAt: payload.completedAt ?? new Date().toISOString(),
     });
@@ -190,7 +207,9 @@ export class CommandManager {
       });
     }
 
-    this.broadcastCommandUpdate(updated);
+    this.broadcastCommandUpdate(updated, {
+      includeImage: cmd.type === 'SCREENSHOT' && status === 'succeeded',
+    });
     return { ok: true };
   }
 
@@ -226,26 +245,65 @@ export class CommandManager {
     this.agentSocket = ws;
     const agent = this.getAgentInfo();
     if (!agent?.deviceId) return;
+    if (this.apps.listPublic().length > 0) {
+      this.syncAppsToAgent();
+    }
     const pending = await this.store.listPendingForDevice(agent.deviceId);
     for (const cmd of pending) {
       await this.deliverCommand(cmd);
     }
   }
 
-  /** @param {object} command */
-  broadcastCommandUpdate(command) {
+  syncAppsToAgent() {
+    if (!this.agentSocket || this.agentSocket.readyState !== 1) return false;
+    if (!this.apps.apps.length) return false;
+    this.agentSocket.send(JSON.stringify({
+      type: 'apps_config',
+      payload: { apps: this.apps.apps },
+    }));
+    return true;
+  }
+
+  /** @param {unknown[]} apps */
+  updateApps(apps) {
+    const result = this.apps.replaceAll(apps);
+    if (!result.ok) return result;
+    const synced = this.syncAppsToAgent();
+    return { ...result, synced };
+  }
+
+  async expireRunningCommands(maxAgeMs = 120_000) {
+    await this.store.expireRunning(maxAgeMs);
+  }
+
+  /** @param {object} command @param {{ includeImage?: boolean }} [opts] */
+  broadcastCommandUpdate(command, opts = {}) {
     if (!command) return;
     const msg = JSON.stringify({
       type: 'command_update',
-      payload: { command: this.publicCommand(command) },
+      payload: { command: this.publicCommand(command, opts) },
     });
     for (const d of this.dashboards) {
       if (d.readyState === 1) d.send(msg);
     }
   }
 
-  /** @param {object} command */
-  publicCommand(command) {
+  /** @param {object|null|undefined} result @param {{ includeImage?: boolean }} [opts] */
+  sanitizeResult(result, opts = {}) {
+    if (!result || typeof result !== 'object') return result ?? null;
+    if (result.imageBase64 && !opts.includeImage) {
+      const { imageBase64, ...rest } = result;
+      return {
+        ...rest,
+        hasPreview: true,
+        telegramSent: Boolean(rest.telegramSent),
+      };
+    }
+    return result;
+  }
+
+  /** @param {object} command @param {{ includeImage?: boolean }} [opts] */
+  publicCommand(command, opts = {}) {
     return {
       id: command.id,
       deviceId: command.deviceId,
@@ -258,7 +316,7 @@ export class CommandManager {
       confirmationLevel: command.confirmationLevel ?? getConfirmationLevel(command.type),
       acknowledgedAt: command.acknowledgedAt ?? null,
       completedAt: command.completedAt ?? null,
-      result: command.result ?? null,
+      result: this.sanitizeResult(command.result, opts),
       errorCode: command.errorCode ?? null,
       cancelledAt: command.cancelledAt ?? null,
     };

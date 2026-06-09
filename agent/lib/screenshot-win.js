@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 const SCRIPT = `
@@ -6,25 +9,25 @@ $screen = [Windows.Forms.Screen]::PrimaryScreen.Bounds
 $bmp = New-Object Drawing.Bitmap $screen.Width, $screen.Height
 $graphics = [Drawing.Graphics]::FromImage($bmp)
 $graphics.CopyFromScreen($screen.Location, [Drawing.Point]::Empty, $screen.Size)
-$ms = New-Object IO.MemoryStream
+$path = Join-Path $env:TEMP ("pcm-shot-" + [guid]::NewGuid().ToString("N") + ".jpg")
 $encoder = [Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
 $quality = New-Object Drawing.Imaging.EncoderParameters(1)
-$quality.Param[0] = New-Object Drawing.Imaging.EncoderParameter([Drawing.Imaging.Encoder]::Quality, 75)
-$bmp.Save($ms, $encoder, $quality)
+$quality.Param[0] = New-Object Drawing.Imaging.EncoderParameter([Drawing.Imaging.Encoder]::Quality, 70)
+$bmp.Save($path, $encoder, $quality)
 $graphics.Dispose()
 $bmp.Dispose()
-[Convert]::ToBase64String($ms.ToArray())
+Write-Output $path
 `.trim();
 
 /**
  * @param {number} [timeoutMs]
- * @returns {Promise<string>}
+ * @returns {Promise<{ base64: string, bytes: number }>}
  */
-export function capturePrimaryScreenJpegBase64(timeoutMs = 20_000) {
+export function capturePrimaryScreenJpegBase64(timeoutMs = 25_000) {
   return new Promise((resolve, reject) => {
     const child = spawn(
       'powershell.exe',
-      ['-NoProfile', '-NoLogo', '-NonInteractive', '-Command', SCRIPT],
+      ['-NoProfile', '-NoLogo', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', SCRIPT],
       { windowsHide: true },
     );
 
@@ -49,12 +52,21 @@ export function capturePrimaryScreenJpegBase64(timeoutMs = 20_000) {
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      const data = stdout.replace(/\s+/g, '');
-      if (code !== 0 || !data) {
+      const filePath = stdout.trim().split(/\r?\n/).pop()?.trim();
+      if (code !== 0 || !filePath || !fs.existsSync(filePath)) {
         reject(new Error(stderr.trim() || 'SCREENSHOT_FAILED'));
         return;
       }
-      resolve(data);
+      try {
+        const buf = fs.readFileSync(filePath);
+        fs.unlinkSync(filePath);
+        resolve({
+          base64: buf.toString('base64'),
+          bytes: buf.length,
+        });
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error('SCREENSHOT_READ_FAILED'));
+      }
     });
   });
 }

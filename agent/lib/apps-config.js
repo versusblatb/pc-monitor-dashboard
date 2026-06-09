@@ -49,4 +49,29 @@ export function getAppById(appId) {
   return appsById.get(appId) ?? null;
 }
 
+/** @param {object[]} apps */
+export function replaceAppsConfig(apps) {
+  const next = [];
+  for (const app of apps) {
+    if (!app?.id || !APP_ID_RE.test(app.id)) continue;
+    const exe = String(app.executable ?? '');
+    if (!isSafeExecutable(exe)) continue;
+    next.push({
+      id: app.id,
+      label: String(app.label ?? app.id),
+      executable: exe,
+      args: Array.isArray(app.args) ? app.args.map(String) : [],
+      allowStop: Boolean(app.allowStop),
+    });
+  }
+  appsById = new Map(next.map((a) => [a.id, a]));
+  try {
+    fs.mkdirSync(path.dirname(path.resolve(APPS_CONFIG_PATH)), { recursive: true });
+    fs.writeFileSync(path.resolve(APPS_CONFIG_PATH), JSON.stringify({ apps: next }, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[agent] failed to persist apps.json:', err instanceof Error ? err.message : err);
+  }
+  return getPublicAppsList();
+}
+
 loadAppsConfig();

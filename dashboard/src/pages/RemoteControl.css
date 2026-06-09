@@ -46,6 +46,27 @@
   gap: 8px;
 }
 
+.rc-apps-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rc-app-editor-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.rc-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted, #8b949e);
+}
+
 .rc-modal-backdrop {
   position: fixed;
   inset: 0;

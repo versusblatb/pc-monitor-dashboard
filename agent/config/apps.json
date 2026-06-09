@@ -6,6 +6,27 @@
       "executable": "C:\\Windows\\System32\\notepad.exe",
       "args": [],
       "allowStop": true
+    },
+    {
+      "id": "calc",
+      "label": "Калькулятор",
+      "executable": "C:\\Windows\\System32\\calc.exe",
+      "args": [],
+      "allowStop": true
+    },
+    {
+      "id": "paint",
+      "label": "Paint",
+      "executable": "C:\\Windows\\System32\\mspaint.exe",
+      "args": [],
+      "allowStop": true
+    },
+    {
+      "id": "explorer",
+      "label": "Проводник",
+      "executable": "C:\\Windows\\explorer.exe",
+      "args": [],
+      "allowStop": false
     }
   ]
 }

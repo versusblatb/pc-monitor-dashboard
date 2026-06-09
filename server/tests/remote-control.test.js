@@ -187,4 +187,39 @@ describe('CommandManager', () => {
     assert.equal(result.ok, false);
     assert.equal(result.error, 'INVALID_APP_ID');
   });
+
+  it('sanitizes screenshot base64 from list responses', () => {
+    const pub = manager.publicCommand({
+      id: '1',
+      deviceId: 'device-1',
+      type: 'SCREENSHOT',
+      params: {},
+      status: 'succeeded',
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date().toISOString(),
+      requestedBy: 'x',
+      result: { imageBase64: 'abc', mimeType: 'image/jpeg', telegramSent: true },
+    });
+    assert.equal(pub.result.hasPreview, true);
+    assert.equal(pub.result.telegramSent, true);
+    assert.equal(pub.result.imageBase64, undefined);
+  });
+
+  it('triggers telegram alert on screenshot success', async () => {
+    /** @type {object[]} */
+    const alerts = [];
+    manager.onTelegramAlert = async (e) => { alerts.push(e); };
+    const cmd = baseCommand({ type: 'SCREENSHOT' });
+    cmd.status = 'running';
+    cmd.signature = signCommand(cmd, SECRET);
+    await manager.store.insert(cmd);
+    await manager.handleCommandResult({
+      commandId: cmd.id,
+      status: 'succeeded',
+      result: { imageBase64: Buffer.from('jpeg').toString('base64'), mimeType: 'image/jpeg' },
+    });
+    assert.equal(alerts.length, 2);
+    assert.equal(alerts[0].kind, 'screenshot_photo');
+    assert.ok(alerts[0].imageBase64);
+  });
 });

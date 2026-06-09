@@ -93,6 +93,12 @@ export const commandApi = {
     commandFetch('/remote-control/apps', {
       headers: csrf ? { 'X-CSRF-Token': csrf } : {},
     }),
+  saveApps: (apps, csrf) =>
+    commandFetch('/remote-control/apps', {
+      method: 'PUT',
+      headers: { 'X-CSRF-Token': csrf },
+      body: JSON.stringify({ apps }),
+    }),
   commands: (csrf) =>
     commandFetch('/remote-control/commands', {
       headers: csrf ? { 'X-CSRF-Token': csrf } : {},
@@ -112,5 +118,9 @@ export const commandApi = {
       method: 'POST',
       headers: { 'X-CSRF-Token': csrf },
       body: JSON.stringify({}),
+    }),
+  getCommand: (id, csrf) =>
+    commandFetch(`/remote-control/commands/${id}`, {
+      headers: csrf ? { 'X-CSRF-Token': csrf } : {},
     }),
 };

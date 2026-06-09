@@ -121,6 +121,9 @@ export function RemoteControl() {
   const [msg, setMsg] = useState(null);
   const [msgKind, setMsgKind] = useState('info');
   const [screenshot, setScreenshot] = useState(null);
+  const [appsEditable, setAppsEditable] = useState(false);
+  const [draftApps, setDraftApps] = useState([]);
+  const [newApp, setNewApp] = useState({ id: '', label: '', executable: '', allowStop: true });
 
   const agentVersion = caps?.agentVersion ?? metrics?.agentVersion ?? '—';
   const agentReady = Boolean(caps?.agentOnline);
@@ -157,6 +160,8 @@ export function RemoteControl() {
     if (protectedLoadRef.current !== loadId) return;
     setCaps(c);
     setApps(a.apps ?? []);
+    setAppsEditable(Boolean(a.editable));
+    setDraftApps((a.apps ?? []).map((app) => ({ ...app, executable: app.executable || '' })));
     setCommands(list.commands ?? []);
     setAudit(log.audit ?? []);
   }, [isAuthenticated, commandsEnabled, csrf]);
@@ -203,6 +208,8 @@ export function RemoteControl() {
         mimeType: command.result.mimeType || 'image/jpeg',
         data: command.result.imageBase64,
       });
+      setMsgKind('ok');
+      setMsg(t('remote.screenshotTelegram'));
     }
     if (command.status === 'succeeded') {
       setMsgKind('ok');
@@ -248,6 +255,72 @@ export function RemoteControl() {
     } finally {
       setBusy(false);
       setModal(null);
+    }
+  };
+
+  const saveAppsList = async () => {
+    setBusy(true);
+    try {
+      const payload = draftApps.map((a) => ({
+        id: a.id,
+        label: a.label || a.id,
+        executable: a.executable,
+        args: [],
+        allowStop: Boolean(a.allowStop),
+      }));
+      const res = await commandApi.saveApps(payload, csrf());
+      if (!res.synced) {
+        setMsgKind('error');
+        setMsg(t('remote.appsSyncFailed'));
+      } else {
+        setMsgKind('ok');
+        setMsg(t('remote.appsSaved'));
+      }
+      await loadProtectedData();
+    } catch (e) {
+      setMsgKind('error');
+      setMsg(resolveCommandError(e, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addDraftApp = () => {
+    const id = newApp.id.trim().toLowerCase();
+    if (!id || !newApp.executable.trim()) return;
+    setDraftApps((prev) => [...prev, {
+      id,
+      label: newApp.label.trim() || id,
+      executable: newApp.executable.trim(),
+      allowStop: newApp.allowStop,
+    }]);
+    setNewApp({ id: '', label: '', executable: '', allowStop: true });
+  };
+
+  const openScreenshotPreview = async (command) => {
+    if (command.result?.imageBase64) {
+      setScreenshot({
+        mimeType: command.result.mimeType || 'image/jpeg',
+        data: command.result.imageBase64,
+      });
+      return;
+    }
+    if (!command.result?.hasPreview) return;
+    setBusy(true);
+    try {
+      const res = await commandApi.getCommand(command.id, csrf());
+      const img = res.command?.result?.imageBase64;
+      if (img) {
+        setScreenshot({
+          mimeType: res.command.result.mimeType || 'image/jpeg',
+          data: img,
+        });
+      }
+    } catch (e) {
+      setMsgKind('error');
+      setMsg(resolveCommandError(e, t));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -429,13 +502,53 @@ export function RemoteControl() {
           {apps.map((app) => (
             <div key={app.id} className="rc-app-row">
               <span>{app.label}</span>
-              <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('launchApp') || busy} onClick={() => openConfirm('LAUNCH_APP', { appId: app.id })}>{t('remote.launch')}</button>
+              <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('launchApp') || busy} onClick={() => sendCommand('LAUNCH_APP', { appId: app.id })}>{t('remote.launch')}</button>
               {app.allowStop && (
                 <button type="button" className="btn btn--ghost rc-btn" disabled={disabledOffline || !cap('stopApp') || busy} onClick={() => openConfirm('STOP_APP', { appId: app.id })}>{t('remote.stop')}</button>
               )}
             </div>
           ))}
           {!apps.length && <p className="muted">{t('remote.noApps')}</p>}
+        </div>
+      </section>
+
+      <section className="panel">
+        <h3 className="section-title">{t('remote.appsManage')}</h3>
+        <p className="muted">{t('remote.appsHint')}</p>
+        <div className="rc-apps-editor">
+          {draftApps.map((app, idx) => (
+            <div key={`${app.id}-${idx}`} className="rc-app-editor-row">
+              <input className="search-input" value={app.id} readOnly />
+              <input className="search-input" value={app.label} onChange={(e) => {
+                const next = [...draftApps];
+                next[idx] = { ...app, label: e.target.value };
+                setDraftApps(next);
+              }} />
+              <input className="search-input" value={app.executable || ''} onChange={(e) => {
+                const next = [...draftApps];
+                next[idx] = { ...app, executable: e.target.value };
+                setDraftApps(next);
+              }} />
+              <label className="rc-check">
+                <input type="checkbox" checked={Boolean(app.allowStop)} onChange={(e) => {
+                  const next = [...draftApps];
+                  next[idx] = { ...app, allowStop: e.target.checked };
+                  setDraftApps(next);
+                }} />
+                {t('remote.appAllowStop')}
+              </label>
+              <button type="button" className="btn btn--ghost" onClick={() => setDraftApps((prev) => prev.filter((_, i) => i !== idx))}>{t('remote.removeApp')}</button>
+            </div>
+          ))}
+          <div className="rc-app-editor-row">
+            <input className="search-input" placeholder={t('remote.appId')} value={newApp.id} onChange={(e) => setNewApp((s) => ({ ...s, id: e.target.value }))} />
+            <input className="search-input" placeholder={t('remote.appLabel')} value={newApp.label} onChange={(e) => setNewApp((s) => ({ ...s, label: e.target.value }))} />
+            <input className="search-input" placeholder={t('remote.appPath')} value={newApp.executable} onChange={(e) => setNewApp((s) => ({ ...s, executable: e.target.value }))} />
+            <button type="button" className="btn btn--ghost" onClick={addDraftApp}>{t('remote.addApp')}</button>
+          </div>
+          <button type="button" className="btn" disabled={!appsEditable || busy || !draftApps.length} onClick={saveAppsList}>
+            {t('remote.saveApps')}
+          </button>
         </div>
       </section>
 
@@ -524,11 +637,11 @@ export function RemoteControl() {
                         {t('remote.cancel')}
                       </button>
                     )}
-                    {c.type === 'SCREENSHOT' && c.status === 'succeeded' && c.result?.imageBase64 && (
+                    {c.type === 'SCREENSHOT' && c.status === 'succeeded' && (c.result?.imageBase64 || c.result?.hasPreview) && (
                       <button
                         type="button"
                         className="btn btn--ghost"
-                        onClick={() => setScreenshot({ mimeType: c.result.mimeType || 'image/jpeg', data: c.result.imageBase64 })}
+                        onClick={() => openScreenshotPreview(c)}
                       >
                         {t('remote.screenshotPreview')}
                       </button>

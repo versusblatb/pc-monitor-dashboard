@@ -23,6 +23,7 @@ import {
   handleAgentAuth,
   initAgentConnection,
   isAgentAuthenticated,
+  updateAgentApps,
 } from './commands/agent-auth.js';
 import { handleCommandSessionRoute } from './routes/command-session.js';
 import { handleRemoteControlRoute } from './routes/remote-control.js';
@@ -254,6 +255,11 @@ async function handleAgentMessage(ws, raw) {
       await commands.handleCommandResult(msg.payload);
       return;
     }
+
+    if (msg.type === 'apps_config_ack' && Array.isArray(msg.payload?.apps)) {
+      updateAgentApps(ws, msg.payload.apps);
+      return;
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[server] agent message error:', message);
@@ -436,6 +442,7 @@ setInterval(() => {
   updateStatus();
   history.flushPending();
   commands.expireStaleCommands().catch(() => {});
+  commands.expireRunningCommands().catch(() => {});
   commands.audit.prune().catch(() => {});
   if (deviceStatus !== prev || !isAgentOnline()) broadcastStatus();
 }, 3000);

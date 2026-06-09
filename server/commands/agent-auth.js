@@ -100,6 +100,21 @@ export function defaultCapabilities() {
   };
 }
 
+/** @param {import('ws').WebSocket} ws @param {object[]} apps */
+export function updateAgentApps(ws, apps) {
+  const state = getAgentState(ws);
+  if (!state?.capabilities) return false;
+  state.capabilities = {
+    ...state.capabilities,
+    apps: apps.map((a) => ({
+      id: a.id,
+      label: a.label,
+      allowStop: Boolean(a.allowStop),
+    })),
+  };
+  return true;
+}
+
 /** @param {import('ws').WebSocket} ws */
 export function clearAgentState(ws) {
   const state = getAgentState(ws);

@@ -1,4 +1,4 @@
-import { sendTelegram } from '../alerts/telegram.js';
+import { sendTelegram, sendTelegramPhoto } from '../alerts/telegram.js';
 
 export function createCommandTelegramNotifier(getConfig) {
   return async function notifyCommandAlert(event) {
@@ -6,10 +6,27 @@ export function createCommandTelegramNotifier(getConfig) {
     const cfg = await getConfig();
     if (!cfg?.botToken || !cfg?.chatId) return;
 
-    const { kind, command, hostname } = event;
+    const { kind, command, hostname, imageBase64 } = event;
     const device = hostname || command?.deviceId || 'unknown';
     const type = command?.type || 'UNKNOWN';
     const status = command?.status || kind;
+
+    if (kind === 'screenshot_photo' && imageBase64) {
+      try {
+        const buf = Buffer.from(String(imageBase64), 'base64');
+        if (buf.length > 0 && buf.length < 10 * 1024 * 1024) {
+          await sendTelegramPhoto({
+            token: cfg.botToken,
+            chatId: cfg.chatId,
+            photo: buf,
+            caption: `📸 Remote Control\n${device}\n${new Date().toLocaleString('ru-RU')}`,
+          });
+        }
+      } catch (e) {
+        console.error('[commands] screenshot telegram failed:', e instanceof Error ? e.message : e);
+      }
+      return;
+    }
 
     const notifyKinds = new Set([
       'login_failed',

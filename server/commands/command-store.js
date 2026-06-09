@@ -159,6 +159,32 @@ export class CommandStore {
     );
   }
 
+  async expireRunning(maxAgeMs = 120_000) {
+    const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
+    const now = new Date().toISOString();
+    if (this.pool) {
+      await this.pool.query(
+        `UPDATE remote_commands
+         SET status = 'failed', error_code = 'COMMAND_TIMEOUT', completed_at = $1
+         WHERE status = 'running' AND acknowledged_at IS NOT NULL AND acknowledged_at < $2`,
+        [now, cutoff],
+      );
+      return;
+    }
+    for (const [id, cmd] of this.memory) {
+      if (cmd.status !== 'running') continue;
+      const ack = cmd.acknowledgedAt;
+      if (ack && ack < cutoff) {
+        this.memory.set(id, {
+          ...cmd,
+          status: 'failed',
+          errorCode: 'COMMAND_TIMEOUT',
+          completedAt: now,
+        });
+      }
+    }
+  }
+
   async expireStale() {
     const now = new Date().toISOString();
     if (this.pool) {

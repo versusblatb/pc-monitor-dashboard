@@ -36,3 +36,31 @@ export async function sendTelegram({ token, chatId, text }) {
     clearTimeout(timer);
   }
 }
+
+/**
+ * @param {{ token: string, chatId: string, photo: Buffer, caption?: string }} opts
+ */
+export async function sendTelegramPhoto({ token, chatId, photo, caption = '' }) {
+  const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS * 2);
+
+  try {
+    const form = new FormData();
+    form.append('chat_id', chatId);
+    if (caption) form.append('caption', caption.slice(0, 1024));
+    form.append('photo', new Blob([photo], { type: 'image/jpeg' }), 'screenshot.jpg');
+
+    const res = await fetch(url, {
+      method: 'POST',
+      body: form,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Telegram photo ${res.status}: ${body.slice(0, 200)}`);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
