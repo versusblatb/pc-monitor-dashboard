@@ -42,7 +42,16 @@ export class AlertManager {
 
     const connectionEvent = this.connection.evaluate(ctx.online);
     if (connectionEvent === 'online') {
-      this.enqueue(`🟢 <b>PC Monitor: ПК онлайн</b>\nУстройство: ${host}\nВремя: ${time}`);
+      const m = ctx.metrics;
+      const cpu = m?.cpu ?? '—';
+      const gpu = m?.gpu ?? '—';
+      const ram = m?.ram ?? '—';
+      const cpuTemp = m?.cpuInfo?.temperature;
+      let extra = `CPU: ${cpu}% · GPU: ${gpu}% · RAM: ${ram}%`;
+      if (cpuTemp != null) extra += `\nCPU temp: ${cpuTemp}°C`;
+      this.enqueue(
+        `🟢 <b>PC Monitor: ПК снова онлайн</b>\nУстройство: ${host}\n${extra}\nВремя: ${time}`,
+      );
     }
     if (connectionEvent === 'offline') {
       this.enqueue(`🔴 <b>PC Monitor: ПК офлайн</b>\nУстройство: ${host}\nВремя: ${time}`);

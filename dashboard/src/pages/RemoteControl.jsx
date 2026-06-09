@@ -7,6 +7,9 @@ import {
   useCommandSession,
 } from '../hooks/useCommandSession.js';
 import { useI18n } from '../i18n/I18nProvider.jsx';
+import { APP_PRESETS } from '../lib/app-presets.js';
+import { notifyCommandSuccess } from '../lib/command-feedback.js';
+import { saveLastCommand } from '../lib/last-command.js';
 import './RemoteControl.css';
 
 const DANGEROUS = new Set(['RESTART', 'SHUTDOWN', 'SCREENSHOT']);
@@ -124,6 +127,8 @@ export function RemoteControl() {
   const [appsEditable, setAppsEditable] = useState(false);
   const [draftApps, setDraftApps] = useState([]);
   const [newApp, setNewApp] = useState({ id: '', label: '', executable: '', allowStop: true });
+  const [launchedApps, setLaunchedApps] = useState({});
+  const [screenshotGallery, setScreenshotGallery] = useState([]);
 
   const agentVersion = caps?.agentVersion ?? metrics?.agentVersion ?? '—';
   const agentReady = Boolean(caps?.agentOnline);
@@ -162,8 +167,16 @@ export function RemoteControl() {
     setApps(a.apps ?? []);
     setAppsEditable(Boolean(a.editable));
     setDraftApps((a.apps ?? []).map((app) => ({ ...app, executable: app.executable || '' })));
-    setCommands(list.commands ?? []);
+    const cmdList = list.commands ?? [];
+    setCommands(cmdList);
     setAudit(log.audit ?? []);
+    const launched = {};
+    for (const c of cmdList) {
+      if (c.type === 'LAUNCH_APP' && c.status === 'succeeded' && c.result?.appId) {
+        launched[c.result.appId] = { pid: c.result.pid ?? null, at: c.completedAt || c.createdAt };
+      }
+    }
+    setLaunchedApps(launched);
   }, [isAuthenticated, commandsEnabled, csrf]);
 
   useEffect(() => {
@@ -177,6 +190,31 @@ export function RemoteControl() {
     });
   }, [isAuthenticated, loadProtectedData, clearProtectedData]);
 
+  const trackCommandOutcome = useCallback((command) => {
+    if (!command?.id) return;
+    saveLastCommand(command);
+    if (command.status === 'succeeded') {
+      notifyCommandSuccess();
+      if (command.type === 'LAUNCH_APP' && command.result?.appId) {
+        setLaunchedApps((prev) => ({
+          ...prev,
+          [command.result.appId]: {
+            pid: command.result.pid ?? null,
+            at: command.completedAt || command.createdAt,
+          },
+        }));
+      }
+      if (command.type === 'SCREENSHOT' && command.result?.imageBase64) {
+        setScreenshotGallery((prev) => [{
+          id: command.id,
+          mimeType: command.result.mimeType || 'image/jpeg',
+          data: command.result.imageBase64,
+          at: command.completedAt || command.createdAt,
+        }, ...prev.filter((s) => s.id !== command.id)].slice(0, 10));
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const onUpdate = (e) => {
       const cmd = e.detail;
@@ -188,10 +226,13 @@ export function RemoteControl() {
         next[idx] = cmd;
         return next;
       });
+      if (['succeeded', 'failed'].includes(cmd.status)) {
+        trackCommandOutcome(cmd);
+      }
     };
     window.addEventListener('pcm-command-update', onUpdate);
     return () => window.removeEventListener('pcm-command-update', onUpdate);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, trackCommandOutcome]);
 
   useEffect(() => {
     if (!isAuthenticated || !hasActiveCommands) return undefined;
@@ -203,6 +244,9 @@ export function RemoteControl() {
 
   const applyCommandResult = (command) => {
     if (!command) return;
+    if (['succeeded', 'failed'].includes(command.status)) {
+      trackCommandOutcome(command);
+    }
     if (command.type === 'SCREENSHOT' && command.status === 'succeeded' && command.result?.imageBase64) {
       setScreenshot({
         mimeType: command.result.mimeType || 'image/jpeg',
@@ -210,16 +254,53 @@ export function RemoteControl() {
       });
       setMsgKind('ok');
       setMsg(t('remote.screenshotTelegram'));
+      return;
     }
     if (command.status === 'succeeded') {
       setMsgKind('ok');
-      setMsg(t('remote.commandSucceeded'));
+      if (command.type === 'LAUNCH_APP' && command.result?.pid != null) {
+        setMsg(t('remote.appLaunched', { pid: command.result.pid }));
+      } else {
+        setMsg(t('remote.commandSucceeded'));
+      }
     } else if (command.status === 'failed') {
       setMsgKind('error');
       setMsg(command.errorCode || t('remote.commandFailed'));
     } else {
       setMsgKind('info');
       setMsg(t('remote.commandQueued'));
+    }
+  };
+
+  const auditEventLabel = (eventType) => {
+    const key = `remote.auditEvents.${eventType}`;
+    const label = t(key);
+    return label !== key ? label : eventType;
+  };
+
+  const downloadAudit = async () => {
+    setBusy(true);
+    try {
+      const blob = await commandApi.downloadAuditCsv(csrf());
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `remote-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setMsgKind('error');
+      setMsg(resolveCommandError(e, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const launchPreset = async (preset) => {
+    const ids = preset.appIds.filter((id) => apps.some((a) => a.id === id));
+    for (const appId of ids) {
+      // eslint-disable-next-line no-await-in-loop
+      await sendCommand('LAUNCH_APP', { appId });
     }
   };
 
@@ -482,17 +563,36 @@ export function RemoteControl() {
       <section className="panel">
         <h3 className="section-title">{t('remote.quickActions')}</h3>
         <div className="rc-actions">
-          <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('lock') || busy} onClick={() => openConfirm('LOCK')}>Lock</button>
-          <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('sleep') || busy} onClick={() => openConfirm('SLEEP')}>Sleep</button>
-          <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('hibernate') || busy} onClick={() => openConfirm('HIBERNATE')}>Hibernate</button>
+          <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('lock') || busy} onClick={() => openConfirm('LOCK')}>{t('remote.commands.LOCK')}</button>
+          <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('unlock') || busy} onClick={() => openConfirm('UNLOCK')}>{t('remote.commands.UNLOCK')}</button>
+          <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('sleep') || busy} onClick={() => openConfirm('SLEEP')}>{t('remote.commands.SLEEP')}</button>
+          <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('hibernate') || busy} onClick={() => openConfirm('HIBERNATE')}>{t('remote.commands.HIBERNATE')}</button>
         </div>
+        {cap('unlock') && <p className="muted">{t('remote.unlockHint')}</p>}
       </section>
 
       <section className="panel">
         <h3 className="section-title">{t('remote.power')}</h3>
         <div className="rc-actions">
-          <button type="button" className="btn btn--danger rc-btn" disabled={disabledOffline || !cap('restart') || busy} onClick={() => openConfirm('RESTART')}>Restart</button>
-          <button type="button" className="btn btn--danger rc-btn" disabled={disabledOffline || !cap('shutdown') || busy} onClick={() => openConfirm('SHUTDOWN')}>Shutdown</button>
+          <button type="button" className="btn btn--danger rc-btn" disabled={disabledOffline || !cap('restart') || busy} onClick={() => openConfirm('RESTART')}>{t('remote.commands.RESTART')}</button>
+          <button type="button" className="btn btn--danger rc-btn" disabled={disabledOffline || !cap('shutdown') || busy} onClick={() => openConfirm('SHUTDOWN')}>{t('remote.commands.SHUTDOWN')}</button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h3 className="section-title">{t('remote.presets')}</h3>
+        <div className="rc-actions">
+          {APP_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className="btn btn--ghost rc-btn"
+              disabled={disabledOffline || !cap('launchApp') || busy}
+              onClick={() => launchPreset(preset)}
+            >
+              {t(`remote.preset${preset.id.charAt(0).toUpperCase()}${preset.id.slice(1)}`)}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -501,7 +601,14 @@ export function RemoteControl() {
         <div className="rc-apps">
           {apps.map((app) => (
             <div key={app.id} className="rc-app-row">
-              <span>{app.label}</span>
+              <span>
+                {app.label}
+                {launchedApps[app.id]?.pid != null && (
+                  <span className="rc-chip rc-chip--ok rc-chip--inline">
+                    {t('remote.appLaunched', { pid: launchedApps[app.id].pid })}
+                  </span>
+                )}
+              </span>
               <button type="button" className="btn rc-btn" disabled={disabledOffline || !cap('launchApp') || busy} onClick={() => sendCommand('LAUNCH_APP', { appId: app.id })}>{t('remote.launch')}</button>
               {app.allowStop && (
                 <button type="button" className="btn btn--ghost rc-btn" disabled={disabledOffline || !cap('stopApp') || busy} onClick={() => openConfirm('STOP_APP', { appId: app.id })}>{t('remote.stop')}</button>
@@ -607,13 +714,46 @@ export function RemoteControl() {
           disabled={disabledOffline || !cap('screenshot') || busy}
           onClick={() => openConfirm('SCREENSHOT')}
         >
-          Screenshot
+          {t('remote.commands.SCREENSHOT')}
         </button>
       </section>
 
       <section className="panel">
+        <h3 className="section-title">{t('remote.screenshotGallery')}</h3>
+        {screenshotGallery.length ? (
+          <div className="rc-shot-gallery">
+            {screenshotGallery.map((shot) => (
+              <button
+                key={shot.id}
+                type="button"
+                className="rc-shot-thumb"
+                onClick={() => setScreenshot({ mimeType: shot.mimeType, data: shot.data })}
+              >
+                <img src={`data:${shot.mimeType};base64,${shot.data}`} alt="" />
+                <span>{new Date(shot.at).toLocaleString()}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">{t('remote.noScreenshots')}</p>
+        )}
+      </section>
+
+      <section className="panel">
         <h3 className="section-title">{t('remote.recentCommands')}</h3>
-        <div className="rc-table-wrap">
+        <div className="rc-commands-mobile">
+          {commands.slice(0, 8).map((c) => (
+            <div key={c.id} className="rc-command-card">
+              <div className="rc-command-card__head">
+                <strong>{t(`remote.commands.${c.type}`, c.type)}</strong>
+                <span className={`status-pill ${statusClass(c.status)}`}>{statusLabel(c.status, t)}</span>
+              </div>
+              <p className="muted">{new Date(c.createdAt).toLocaleString()}</p>
+              {c.errorCode && <p className="rc-msg--error">{c.errorCode}</p>}
+            </div>
+          ))}
+        </div>
+        <div className="rc-table-wrap rc-table-wrap--desktop">
           <table className="data-table">
             <thead>
               <tr>
@@ -628,7 +768,7 @@ export function RemoteControl() {
               {commands.map((c) => (
                 <tr key={c.id}>
                   <td>{new Date(c.createdAt).toLocaleString()}</td>
-                  <td>{c.type}</td>
+                  <td>{t(`remote.commands.${c.type}`, c.type)}</td>
                   <td><span className={`status-pill ${statusClass(c.status)}`}>{statusLabel(c.status, t)}</span></td>
                   <td>{c.errorCode ?? '—'}</td>
                   <td>
@@ -655,12 +795,21 @@ export function RemoteControl() {
       </section>
 
       <section className="panel">
-        <h3 className="section-title">{t('remote.audit')}</h3>
-        <ul className="rc-audit">
+        <div className="rc-head">
+          <h3 className="section-title">{t('remote.audit')}</h3>
+          <button type="button" className="btn btn--ghost" disabled={busy} onClick={downloadAudit}>
+            {t('remote.downloadAudit')}
+          </button>
+        </div>
+        <ul className="rc-audit rc-audit--detailed">
           {audit.slice(0, 20).map((e) => (
             <li key={e.id}>
-              <span>{new Date(e.timestamp).toLocaleString()}</span>
-              <span>{e.eventType}</span>
+              <span className="rc-audit__time">{new Date(e.timestamp).toLocaleString()}</span>
+              <span className="rc-audit__event">{auditEventLabel(e.eventType)}</span>
+              <span className="rc-audit__meta">
+                {t('remote.auditActor')}: {e.actorType || '—'}
+                {e.safeMetadata?.type ? ` · ${t('remote.auditCommand')}: ${t(`remote.commands.${e.safeMetadata.type}`, e.safeMetadata.type)}` : ''}
+              </span>
             </li>
           ))}
         </ul>

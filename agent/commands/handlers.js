@@ -3,12 +3,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { launchWindowsApp } from '../lib/launch-win.js';
 import { capturePrimaryScreenJpegBase64 } from '../lib/screenshot-win.js';
+import { unlockWorkstation } from '../lib/unlock-win.js';
 import { spawnSafe } from './spawn-safe.js';
 import { getAppById } from '../lib/apps-config.js';
 import {
   ALLOW_SCREENSHOT,
+  ALLOW_UNLOCK,
   COMMAND_EXECUTION_MODE,
   SCREENSHOT_TTL_MS,
+  UNLOCK_PASSWORD,
 } from '../config.js';
 
 /** @type {Map<string, number>} */
@@ -32,6 +35,26 @@ export async function handleLock() {
   if (COMMAND_EXECUTION_MODE === 'mock') return { message: 'lock (mock)' };
   await spawnSafe('rundll32.exe', ['user32.dll,LockWorkStation']);
   return { message: 'workstation locked' };
+}
+
+export async function handleUnlock() {
+  if (!ALLOW_UNLOCK) {
+    return { errorCode: 'UNLOCK_DISABLED', message: 'unlock disabled in agent settings' };
+  }
+  if (COMMAND_EXECUTION_MODE === 'mock') return { message: 'unlock (mock)' };
+  if (process.platform !== 'win32') {
+    return { errorCode: 'UNSUPPORTED', message: 'unlock supported on Windows only' };
+  }
+  if (!UNLOCK_PASSWORD) {
+    return { errorCode: 'UNLOCK_PASSWORD_NOT_SET', message: 'set UNLOCK_PASSWORD in agent .env' };
+  }
+  try {
+    const result = await unlockWorkstation(UNLOCK_PASSWORD);
+    return { message: result.message, method: result.method };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unlock failed';
+    return { errorCode: 'UNLOCK_FAILED', message };
+  }
 }
 
 export async function handleSleep() {

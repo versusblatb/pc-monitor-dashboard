@@ -25,6 +25,7 @@ export function validateCommandParams(type, params) {
 
   switch (type) {
     case 'LOCK':
+    case 'UNLOCK':
     case 'SLEEP':
     case 'HIBERNATE':
     case 'SHUTDOWN':

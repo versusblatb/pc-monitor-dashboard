@@ -1,8 +1,9 @@
-/** @typedef {'LOCK'|'SLEEP'|'HIBERNATE'|'SHUTDOWN'|'RESTART'|'LAUNCH_APP'|'STOP_APP'|'CLEAR_TEMP'|'SCREENSHOT'} CommandType */
+/** @typedef {'LOCK'|'UNLOCK'|'SLEEP'|'HIBERNATE'|'SHUTDOWN'|'RESTART'|'LAUNCH_APP'|'STOP_APP'|'CLEAR_TEMP'|'SCREENSHOT'} CommandType */
 
 /** @type {readonly CommandType[]} */
 export const COMMAND_TYPES = Object.freeze([
   'LOCK',
+  'UNLOCK',
   'SLEEP',
   'HIBERNATE',
   'SHUTDOWN',
@@ -16,6 +17,7 @@ export const COMMAND_TYPES = Object.freeze([
 /** @type {Record<CommandType, number>} */
 export const COMMAND_TTL_MS = Object.freeze({
   LOCK: 30_000,
+  UNLOCK: 30_000,
   SLEEP: 30_000,
   HIBERNATE: 30_000,
   SHUTDOWN: 30_000,
@@ -29,6 +31,7 @@ export const COMMAND_TTL_MS = Object.freeze({
 /** @type {Record<CommandType, 'safe'|'medium'|'dangerous'>} */
 export const CONFIRMATION_LEVELS = Object.freeze({
   LOCK: 'safe',
+  UNLOCK: 'medium',
   LAUNCH_APP: 'safe',
   SLEEP: 'medium',
   HIBERNATE: 'medium',
@@ -42,6 +45,7 @@ export const CONFIRMATION_LEVELS = Object.freeze({
 /** @type {Record<CommandType, CommandType|null>} */
 export const TYPED_CONFIRMATIONS = Object.freeze({
   LOCK: null,
+  UNLOCK: null,
   LAUNCH_APP: null,
   SLEEP: null,
   HIBERNATE: null,

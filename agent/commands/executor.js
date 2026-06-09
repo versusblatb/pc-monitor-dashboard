@@ -12,6 +12,7 @@ import {
   handleHibernate,
   handleLaunchApp,
   handleLock,
+  handleUnlock,
   handleRestart,
   handleScreenshot,
   handleShutdown,
@@ -32,6 +33,7 @@ function commandTimeoutMs(type) {
 
 const HANDLERS = {
   LOCK: handleLock,
+  UNLOCK: handleUnlock,
   SLEEP: handleSleep,
   HIBERNATE: handleHibernate,
   SHUTDOWN: handleShutdown,

@@ -27,6 +27,8 @@ export const AGENT_AUTH_TOKEN = process.env.AGENT_AUTH_TOKEN || '';
 export const COMMAND_SIGNING_SECRET = process.env.COMMAND_SIGNING_SECRET || '';
 export const ALLOW_REMOTE_COMMANDS = process.env.ALLOW_REMOTE_COMMANDS === 'true';
 export const ALLOW_SCREENSHOT = process.env.ALLOW_SCREENSHOT === 'true';
+export const ALLOW_UNLOCK = process.env.ALLOW_UNLOCK === 'true';
+export const UNLOCK_PASSWORD = process.env.UNLOCK_PASSWORD || '';
 export const APPS_CONFIG_PATH = process.env.APPS_CONFIG_PATH || './config/apps.json';
 export const SCREENSHOT_TTL_MS = 2 * 60_000;
 

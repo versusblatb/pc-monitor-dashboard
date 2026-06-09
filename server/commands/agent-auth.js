@@ -89,6 +89,7 @@ function deriveDeviceId(hostname) {
 export function defaultCapabilities() {
   return {
     lock: true,
+    unlock: false,
     sleep: true,
     hibernate: true,
     shutdown: true,

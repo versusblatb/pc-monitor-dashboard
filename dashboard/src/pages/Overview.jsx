@@ -6,6 +6,7 @@ import {
   formatTemperatureSubtitle,
 } from '../lib/format-metrics.js';
 import { useI18n } from '../i18n/I18nProvider.jsx';
+import { LastCommandWidget } from '../components/LastCommandWidget.jsx';
 
 export function Overview({ metrics, history, online, status, lastSeen, wsConnected, stale }) {
   const { t, locale } = useI18n();
@@ -20,6 +21,7 @@ export function Overview({ metrics, history, online, status, lastSeen, wsConnect
           {t('agent.offline')} — {stale ? t('agent.stale') : t('agent.waiting')}
         </div>
       )}
+      <LastCommandWidget />
       <div className="status-row">
         <span className="status-chip">
           {t('status.label')}: <strong>{statusLabel}</strong>

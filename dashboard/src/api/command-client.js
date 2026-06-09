@@ -123,4 +123,18 @@ export const commandApi = {
     commandFetch(`/remote-control/commands/${id}`, {
       headers: csrf ? { 'X-CSRF-Token': csrf } : {},
     }),
+  /** @param {string} csrf */
+  downloadAuditCsv: async (csrf) => {
+    const res = await fetch(resolveCommandUrl('/remote-control/audit?format=csv'), {
+      credentials: 'include',
+      headers: {
+        Accept: 'text/csv',
+        'X-CSRF-Token': csrf,
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return res.blob();
+  },
 };

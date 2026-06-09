@@ -36,6 +36,11 @@ describe('command schema', () => {
     assert.equal(validateCommandType('RUN_SHELL').ok, false);
   });
 
+  it('accepts UNLOCK command type', () => {
+    assert.equal(validateCommandType('UNLOCK').ok, true);
+    assert.equal(validateCommandParams('UNLOCK', {}).ok, true);
+  });
+
   it('rejects invalid LAUNCH_APP params', () => {
     assert.equal(validateCommandParams('LAUNCH_APP', { appId: '../evil' }).ok, false);
     assert.equal(validateCommandParams('LAUNCH_APP', { executable: 'C:\\evil.bat' }).ok, false);

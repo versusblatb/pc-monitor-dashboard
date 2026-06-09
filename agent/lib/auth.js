@@ -4,6 +4,7 @@ import {
   AGENT_VERSION,
   ALLOW_REMOTE_COMMANDS,
   ALLOW_SCREENSHOT,
+  ALLOW_UNLOCK,
   COMMAND_EXECUTION_MODE,
   SCHEMA_VERSION,
 } from '../config.js';
@@ -25,6 +26,7 @@ export function buildAgentAuthMessage() {
 export function buildCapabilities() {
   return {
     lock: ALLOW_REMOTE_COMMANDS,
+    unlock: ALLOW_REMOTE_COMMANDS && ALLOW_UNLOCK,
     sleep: ALLOW_REMOTE_COMMANDS,
     hibernate: ALLOW_REMOTE_COMMANDS,
     shutdown: ALLOW_REMOTE_COMMANDS,
