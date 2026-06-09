@@ -265,7 +265,11 @@ export function RemoteControl() {
       }
     } else if (command.status === 'failed') {
       setMsgKind('error');
-      setMsg(command.errorCode || t('remote.commandFailed'));
+      setMsg(
+        command.errorCode === 'LOCK_SCREEN_SECURE'
+          ? t('remote.unlockSecureHint')
+          : (command.errorCode || t('remote.commandFailed')),
+      );
     } else {
       setMsgKind('info');
       setMsg(t('remote.commandQueued'));

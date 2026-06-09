@@ -53,7 +53,13 @@ export async function handleUnlock() {
     return { message: result.message, method: result.method };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unlock failed';
-    return { errorCode: 'UNLOCK_FAILED', message };
+    console.warn('[agent] unlock failed:', message);
+    const errorCode = message.includes('LOCK_SCREEN_SECURE')
+      ? 'LOCK_SCREEN_SECURE'
+      : message.includes('UNLOCK_TIMEOUT')
+        ? 'UNLOCK_TIMEOUT'
+        : 'UNLOCK_FAILED';
+    return { errorCode, message };
   }
 }
 

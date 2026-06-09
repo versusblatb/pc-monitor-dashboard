@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+; Allow trusted programs to send Ctrl+Alt+Del (Secure Attention Sequence) for remote unlock.
+; Import once as Administrator: double-click or reg import enable-remote-unlock.reg
+; Then restart the agent.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System]
+"SoftwareSASGeneration"=dword:00000003

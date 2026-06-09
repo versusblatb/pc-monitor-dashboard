@@ -247,7 +247,8 @@ export const translations = {
       noScreenshots: 'Снимков пока нет',
       lastCommandTitle: 'Последняя команда',
       openPanel: 'Открыть панель',
-      unlockHint: 'Вводит пароль Windows с агента (UNLOCK_PASSWORD). Работает только в активной сессии пользователя.',
+      unlockHint: 'Вводит пароль Windows с агента (UNLOCK_PASSWORD). После «Блокировки» один раз импортируйте enable-remote-unlock.reg от имени администратора.',
+      unlockSecureHint: 'Экран блокировки Windows не принял пароль. Запустите enable-remote-unlock.reg от администратора и перезапустите агент.',
       auditEvents: {
         command_requested: 'Запрос команды',
         command_delivered: 'Доставлена агенту',
@@ -589,7 +590,8 @@ export const translations = {
       noScreenshots: 'No screenshots yet',
       lastCommandTitle: 'Last command',
       openPanel: 'Open panel',
-      unlockHint: 'Submits the Windows password from the agent (UNLOCK_PASSWORD). Works only in the active user session.',
+      unlockHint: 'Submits the Windows password from the agent (UNLOCK_PASSWORD). After Lock, import enable-remote-unlock.reg once as Administrator.',
+      unlockSecureHint: 'Windows lock screen rejected remote input. Run enable-remote-unlock.reg as Administrator and restart the agent.',
       auditEvents: {
         command_requested: 'Command requested',
         command_delivered: 'Delivered to agent',
