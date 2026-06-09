@@ -6,6 +6,7 @@ import { HistoryManager } from './history/history-manager.js';
 import { describeMetricsShape } from './lib/metrics-shape.js';
 import {
   mergeClientMetrics,
+  MAX_COMMAND_RESULT_BYTES,
   normalizeAgentMessage,
   toClientPayload,
   validateIncomingSize,
@@ -223,8 +224,9 @@ function handleAgentMetrics(raw) {
 /** @param {import('ws').WebSocket} ws @param {Buffer|string} raw */
 async function handleAgentMessage(ws, raw) {
   try {
-    validateIncomingSize(raw);
     const msg = JSON.parse(String(raw));
+    const maxBytes = msg.type === 'command_result' ? MAX_COMMAND_RESULT_BYTES : undefined;
+    validateIncomingSize(raw, maxBytes);
 
     if (msg.type === 'agent_auth') {
       const result = handleAgentAuth(ws, msg.payload);

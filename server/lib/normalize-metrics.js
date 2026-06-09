@@ -8,6 +8,8 @@ import {
 
 const MAX_HOSTNAME_LEN = 64;
 const MAX_WS_BYTES = 128 * 1024;
+/** Screenshots travel as base64 inside command_result — needs a higher WS cap. */
+export const MAX_COMMAND_RESULT_BYTES = 512 * 1024;
 
 /**
  * @param {unknown} msg
@@ -286,11 +288,11 @@ export function mergeClientMetrics(prev, incoming) {
   return mergeMetricsState(prev, incoming);
 }
 
-/** @param {unknown} raw */
-export function validateIncomingSize(raw) {
+/** @param {unknown} raw @param {number} [maxBytes] */
+export function validateIncomingSize(raw, maxBytes = MAX_WS_BYTES) {
   const bytes = Buffer.byteLength(String(raw), 'utf8');
-  if (bytes > MAX_WS_BYTES) {
-    throw new Error(`message too large: ${bytes} bytes`);
+  if (bytes > maxBytes) {
+    throw new Error(`message too large: ${bytes} bytes (max ${maxBytes})`);
   }
 }
 

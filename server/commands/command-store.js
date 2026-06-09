@@ -159,7 +159,7 @@ export class CommandStore {
     );
   }
 
-  async expireRunning(maxAgeMs = 120_000) {
+  async expireRunning(maxAgeMs = 60_000) {
     const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
     const now = new Date().toISOString();
     if (this.pool) {

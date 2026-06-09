@@ -23,6 +23,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DISABLE_FILE = path.join(__dirname, '..', 'data', 'disable-remote-control');
 
 const COMMAND_TIMEOUT_MS = 90_000;
+const SCREENSHOT_TIMEOUT_MS = 35_000;
+
+/** @param {string} type */
+function commandTimeoutMs(type) {
+  return type === 'SCREENSHOT' ? SCREENSHOT_TIMEOUT_MS : COMMAND_TIMEOUT_MS;
+}
 
 const HANDLERS = {
   LOCK: handleLock,
@@ -79,7 +85,7 @@ export function createCommandExecutor(ws, ctx) {
       const result = await Promise.race([
         handler(command.params ?? {}),
         new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('COMMAND_TIMEOUT')), COMMAND_TIMEOUT_MS);
+          setTimeout(() => reject(new Error('COMMAND_TIMEOUT')), commandTimeoutMs(command.type));
         }),
       ]);
       if (result?.errorCode) {
@@ -89,7 +95,8 @@ export function createCommandExecutor(ws, ctx) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'execution failed';
-      sendResult(ws, command.id, 'failed', { message }, 'EXECUTION_ERROR');
+      const errorCode = message === 'COMMAND_TIMEOUT' ? 'COMMAND_TIMEOUT' : 'EXECUTION_ERROR';
+      sendResult(ws, command.id, 'failed', { message }, errorCode);
     }
   };
 }

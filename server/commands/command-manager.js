@@ -272,7 +272,7 @@ export class CommandManager {
     return { ...result, synced };
   }
 
-  async expireRunningCommands(maxAgeMs = 120_000) {
+  async expireRunningCommands(maxAgeMs = 60_000) {
     await this.store.expireRunning(maxAgeMs);
   }
 

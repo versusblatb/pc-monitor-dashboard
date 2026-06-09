@@ -1,9 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  MAX_COMMAND_RESULT_BYTES,
   normalizeAgentMessage,
   normalizeV2Payload,
   toClientPayload,
+  validateIncomingSize,
 } from '../lib/normalize-metrics.js';
 
 describe('normalizeAgentMessage', () => {
@@ -85,5 +87,16 @@ describe('normalizeAgentMessage', () => {
 
     assert.equal(cpu.temperature, 20.5);
     assert.equal(cpu.usage, 10);
+  });
+});
+
+describe('validateIncomingSize', () => {
+  it('allows command_result payloads larger than metrics cap', () => {
+    const payload = JSON.stringify({
+      type: 'command_result',
+      payload: { result: { imageBase64: 'a'.repeat(200_000) } },
+    });
+    assert.doesNotThrow(() => validateIncomingSize(payload, MAX_COMMAND_RESULT_BYTES));
+    assert.throws(() => validateIncomingSize(payload));
   });
 });
